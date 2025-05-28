@@ -31,6 +31,21 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:8081",
+            "http://192.168.155.200:8081",
+            "http://192.168.155.200:19006",
+            "exp://192.168.155.200:19000") // Expo dev server
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Optional for cookies/auth
+    });
+});
+
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddAuthorization();
 
@@ -45,6 +60,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("AllowFrontend");
+
 
 app.UseAuthentication();
 
