@@ -26,6 +26,7 @@ export default function LoginScreen() {
   
       const token = response.data.token;
       await AsyncStorage.setItem('token', token);
+      await AsyncStorage.setItem('userEmail', email);
   
       Alert.alert('Success', 'Logged in successfully!', [
         {

@@ -38,7 +38,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins("http://localhost:8081",
             "http://192.168.155.200:8081",
             "http://192.168.155.200:19006",
-            "exp://192.168.155.200:19000") // Expo dev server
+            "exp://192.168.155.200:19000",
+            "https://44fa-109-245-67-202.ngrok-free.app") // Expo dev server
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Optional for cookies/auth

@@ -5,7 +5,7 @@ const api = axios.create({
   baseURL:
     Platform.OS === 'web'
       ? 'https://localhost:7007/api' // for web
-      : 'http://192.168.155.200:5049/api', // for Android emulator
+      : 'https://44fa-109-245-67-202.ngrok-free.app/api', // for Android emulator
 });
 
 export default api;

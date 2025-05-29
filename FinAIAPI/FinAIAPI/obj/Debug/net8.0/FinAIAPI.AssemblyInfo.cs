@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FinAIAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8149a6b6968c57bdb4d24ef52eb1d5a1c84563d8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c00e9d5a85d1d052dad1dd4cec323ea4b9a6074a")]
 [assembly: System.Reflection.AssemblyProductAttribute("FinAIAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FinAIAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

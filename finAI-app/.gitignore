@@ -37,3 +37,16 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+
+# Ignore IDE stuff
+.vs/
+*.user
+*.suo
+
+# Node stuff
+node_modules/
+
+# Build artifacts
+bin/
+obj/
+
