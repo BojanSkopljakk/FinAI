@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,11 +8,12 @@ import { ThemedView } from '@/components/ThemedView';
 import api from '@/lib/api';
 
 type Budget = {
-  id: string;
+  id: number;
+  userId: string;
   category: string;
   amount: number;
+  month: string;
   spent: number;
-  month: string; // Format: 'YYYY-MM'
 };
 
 const CATEGORIES = [
@@ -42,11 +44,46 @@ export default function BudgetScreen() {
   const loadBudgets = async () => {
     try {
       setIsLoading(true);
+      
+      // Get the auth token
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        console.error('No auth token found');
+        Alert.alert('Error', 'Please log in again');
+        return;
+      }
+
+      console.log('Fetching budgets for month:', currentMonth);
+      
       const response = await api.get(`/budgets/${currentMonth}`);
+      console.log('Response status:', response.status);
+      console.log('Budgets response:', JSON.stringify(response.data, null, 2));
+
+      if (response.status === 401) {
+        Alert.alert('Error', 'Please log in again');
+        return;
+      }
+
+      if (!Array.isArray(response.data)) {
+        console.error('Invalid response format:', response.data);
+        Alert.alert('Error', 'Invalid data received from server');
+        setBudgets([]);
+        return;
+      }
+
       setBudgets(response.data);
     } catch (error: any) {
-      console.error('Error loading budgets:', error?.response?.data || error.message);
-      Alert.alert('Error', 'Failed to load budgets');
+      console.error('Error loading budgets:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      Alert.alert(
+        'Error',
+        'Failed to load budgets. ' +
+        (error.response?.data?.message || error.message || 'Unknown error')
+      );
     } finally {
       setIsLoading(false);
     }
@@ -65,18 +102,86 @@ export default function BudgetScreen() {
         return;
       }
 
-      await api.post('/budgets', {
+      // Check if a budget for this category already exists in the current month
+      const existingBudget = budgets.find(
+        budget => budget.category === selectedCategory && budget.month === currentMonth
+      );
+
+      if (existingBudget) {
+        Alert.alert(
+          'Category Already Exists',
+          `A budget for ${selectedCategory} already exists for this month. Would you like to update it instead?`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel'
+            },
+            {
+              text: 'Update',
+              onPress: async () => {
+                try {
+                  await api.put(`/budgets/${existingBudget.id}`, {
+                    category: selectedCategory,
+                    amount,
+                    month: currentMonth
+                  });
+                  await loadBudgets();
+                  setModalVisible(false);
+                  resetForm();
+                } catch (error: any) {
+                  console.error('Error updating budget:', {
+                    message: error.message,
+                    response: error.response?.data,
+                    status: error.response?.status
+                  });
+                  Alert.alert(
+                    'Error',
+                    'Failed to update budget. ' +
+                    (error.response?.data?.message || error.message || 'Unknown error')
+                  );
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      const budgetData = {
         category: selectedCategory,
         amount,
-        month: currentMonth,
-      });
+        month: currentMonth
+      };
+
+      console.log('Saving budget:', budgetData);
+
+      const response = await api.post('/budgets', budgetData);
+      console.log('Save response:', response.data);
 
       await loadBudgets();
       setModalVisible(false);
       resetForm();
     } catch (error: any) {
-      console.error('Error saving budget:', error?.response?.data || error.message);
-      Alert.alert('Error', 'Failed to save budget');
+      console.error('Error saving budget:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+
+      // Check if it's a duplicate category error from the backend
+      if (error.response?.status === 400 && error.response?.data?.message?.includes('already exists')) {
+        Alert.alert(
+          'Duplicate Category',
+          'A budget for this category already exists for this month.'
+        );
+        return;
+      }
+
+      Alert.alert(
+        'Error',
+        'Failed to save budget. ' +
+        (error.response?.data?.message || error.message || 'Unknown error')
+      );
     }
   };
 
@@ -102,12 +207,48 @@ export default function BudgetScreen() {
     }
   };
 
+  const handleDelete = async (budgetId: number) => {
+    Alert.alert(
+      'Delete Budget',
+      'Are you sure you want to delete this budget?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/budgets/${budgetId}`);
+              await loadBudgets();
+            } catch (error: any) {
+              console.error('Error deleting budget:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+              });
+              Alert.alert(
+                'Error',
+                'Failed to delete budget. ' +
+                (error.response?.data?.message || error.message || 'Unknown error')
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderBudgetItem = ({ item }: { item: Budget }) => {
-    const percentage = (item.spent / item.amount) * 100;
+    const percentage = Math.min((item.spent / item.amount) * 100, 100);
     const progressColor = getProgressColor(item.spent, item.amount);
 
     return (
-      <ThemedView style={styles.budgetItem}>
+      <Pressable
+        onLongPress={() => handleDelete(item.id)}
+        style={({ pressed }) => [
+          styles.budgetItem,
+          pressed && styles.budgetItemPressed
+        ]}>
         <ThemedView style={styles.budgetHeader}>
           <ThemedText style={styles.categoryText}>{item.category}</ThemedText>
           <ThemedText style={styles.amountText}>
@@ -120,7 +261,7 @@ export default function BudgetScreen() {
             style={[
               styles.progressBar, 
               { 
-                width: `${Math.min(percentage, 100)}%`,
+                width: `${percentage}%`,
                 backgroundColor: progressColor
               }
             ]} 
@@ -130,7 +271,17 @@ export default function BudgetScreen() {
         <ThemedText style={[styles.percentageText, { color: progressColor }]}>
           {percentage.toFixed(1)}%
         </ThemedText>
-      </ThemedView>
+
+        {percentage >= 90 && (
+          <ThemedText style={styles.warningText}>
+            Warning: Budget nearly exceeded!
+          </ThemedText>
+        )}
+
+        <ThemedText style={styles.deleteHint}>
+          Long press to delete
+        </ThemedText>
+      </Pressable>
     );
   };
 
@@ -183,7 +334,7 @@ export default function BudgetScreen() {
         <FlatList
           data={budgets}
           renderItem={renderBudgetItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           style={styles.list}
           refreshing={isLoading}
           onRefresh={loadBudgets}
@@ -427,5 +578,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     color: '#666',
+  },
+  warningText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  budgetItemPressed: {
+    opacity: 0.7,
+  },
+  deleteHint: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 5,
+    fontStyle: 'italic',
   },
 }); 
