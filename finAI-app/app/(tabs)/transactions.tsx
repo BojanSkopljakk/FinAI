@@ -51,6 +51,13 @@ export default function TransactionsScreen() {
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
+  // Add new filter states
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+  const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
+  const [showFilterStartDate, setShowFilterStartDate] = useState(false);
+  const [showFilterEndDate, setShowFilterEndDate] = useState(false);
+
   useEffect(() => {
     loadTransactions();
   }, []);
@@ -147,6 +154,52 @@ export default function TransactionsScreen() {
     }
   };
 
+  const handleFilterStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowFilterStartDate(Platform.OS === 'ios');
+    if (selectedDate) {
+      setFilterStartDate(selectedDate);
+    }
+  };
+
+  const handleFilterEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowFilterEndDate(Platform.OS === 'ios');
+    if (selectedDate) {
+      setFilterEndDate(selectedDate);
+    }
+  };
+
+  const clearFilters = () => {
+    setFilterType('all');
+    setFilterStartDate(null);
+    setFilterEndDate(null);
+  };
+
+  const getFilteredTransactions = () => {
+    return transactions.filter(transaction => {
+      // Filter by type
+      if (filterType !== 'all' && transaction.type !== filterType) {
+        return false;
+      }
+
+      // Filter by date range
+      if (filterStartDate || filterEndDate) {
+        const transactionDate = new Date(transaction.date);
+        if (filterStartDate && transactionDate < filterStartDate) {
+          return false;
+        }
+        if (filterEndDate) {
+          const endOfDay = new Date(filterEndDate);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (transactionDate > endOfDay) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+  };
+
   const renderRightActions = (transaction: Transaction) => {
     return (
       <ThemedView style={styles.swipeActions}>
@@ -218,13 +271,87 @@ export default function TransactionsScreen() {
     </Modal>
   );
 
+  const FilterSection = () => (
+    <ThemedView style={styles.filterSection}>
+      <ThemedView style={styles.filterButtons}>
+        <Pressable
+          style={[styles.filterButton, filterType === 'all' && styles.filterButtonActive]}
+          onPress={() => setFilterType('all')}>
+          <ThemedText style={[styles.filterButtonText, filterType === 'all' && styles.filterButtonTextActive]}>
+            All
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[styles.filterButton, filterType === 'expense' && styles.filterButtonActive]}
+          onPress={() => setFilterType('expense')}>
+          <ThemedText style={[styles.filterButtonText, filterType === 'expense' && styles.filterButtonTextActive]}>
+            Expenses
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          style={[styles.filterButton, filterType === 'income' && styles.filterButtonActive]}
+          onPress={() => setFilterType('income')}>
+          <ThemedText style={[styles.filterButtonText, filterType === 'income' && styles.filterButtonTextActive]}>
+            Income
+          </ThemedText>
+        </Pressable>
+      </ThemedView>
+
+      <ThemedView style={styles.dateFilters}>
+        <Pressable
+          style={styles.dateFilterButton}
+          onPress={() => setShowFilterStartDate(true)}>
+          <ThemedText style={styles.dateFilterButtonText}>
+            {filterStartDate ? filterStartDate.toLocaleDateString() : 'Start Date'}
+          </ThemedText>
+        </Pressable>
+        <ThemedText style={styles.dateFilterSeparator}>to</ThemedText>
+        <Pressable
+          style={styles.dateFilterButton}
+          onPress={() => setShowFilterEndDate(true)}>
+          <ThemedText style={styles.dateFilterButtonText}>
+            {filterEndDate ? filterEndDate.toLocaleDateString() : 'End Date'}
+          </ThemedText>
+        </Pressable>
+      </ThemedView>
+
+      {(filterType !== 'all' || filterStartDate || filterEndDate) && (
+        <Pressable style={styles.clearFiltersButton} onPress={clearFilters}>
+          <ThemedText style={styles.clearFiltersText}>Clear Filters</ThemedText>
+        </Pressable>
+      )}
+
+      {showFilterStartDate && (
+        <DateTimePicker
+          value={filterStartDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleFilterStartDateChange}
+          maximumDate={filterEndDate || undefined}
+        />
+      )}
+
+      {showFilterEndDate && (
+        <DateTimePicker
+          value={filterEndDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleFilterEndDateChange}
+          minimumDate={filterStartDate || undefined}
+        />
+      )}
+    </ThemedView>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ThemedView style={styles.container}>
         <ThemedText type="title" style={styles.title}>Transactions</ThemedText>
 
+        <FilterSection />
+
         <FlatList
-          data={transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())}
+          data={getFilteredTransactions().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())}
           renderItem={renderTransaction}
           keyExtractor={(item) => item.id}
           style={styles.list}
@@ -232,7 +359,7 @@ export default function TransactionsScreen() {
           onRefresh={loadTransactions}
           ListEmptyComponent={
             <ThemedText style={styles.emptyText}>
-              {isLoading ? 'Loading transactions...' : 'No transactions yet'}
+              {isLoading ? 'Loading transactions...' : 'No transactions found'}
             </ThemedText>
           }
         />
@@ -551,5 +678,67 @@ const styles = StyleSheet.create({
   },
   selectedCategoryText: {
     color: '#fff',
+  },
+  filterSection: {
+    marginBottom: 20,
+  },
+  filterButtons: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  filterButton: {
+    flex: 1,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#0A84FF',
+    borderColor: '#0A84FF',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  filterButtonTextActive: {
+    color: '#fff',
+  },
+  dateFilters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  dateFilterButton: {
+    flex: 1,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  dateFilterButtonText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  dateFilterSeparator: {
+    marginHorizontal: 8,
+    color: '#666',
+  },
+  clearFiltersButton: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#FF3B30',
+    alignItems: 'center',
+  },
+  clearFiltersText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 }); 
