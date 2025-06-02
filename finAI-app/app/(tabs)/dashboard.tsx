@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Dimensions, ScrollView, StyleSheet } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
+import { LineChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
@@ -22,16 +22,45 @@ type DashboardData = {
   totalIncome: number;
   totalExpense: number;
   categoryBreakdown: CategoryBreakdown[];
-  topCategories: CategoryBreakdown[];
   monthlyTrends: MonthlyTrend[];
+  topCategories: CategoryBreakdown[];
 };
 
-export default function DashboardScreen() {
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const colorCache: { [key: string]: string } = {};
+
+function getRandomColor(key: string): string {
+  if (colorCache[key]) {
+    return colorCache[key];
+  }
+
+  const colors = [
+    '#FF6B6B', // Red
+    '#4ECDC4', // Teal
+    '#45B7D1', // Blue
+    '#96CEB4', // Sage
+    '#FFEEAD', // Yellow
+    '#D4A5A5', // Pink
+    '#9FA8DA', // Purple
+    '#FFE0B2', // Orange
+    '#A5D6A7', // Green
+    '#E0E0E0', // Gray
+  ];
+
+  const index = Object.keys(colorCache).length % colors.length;
+  colorCache[key] = colors[index];
+  return colorCache[key];
+}
+
+export default function dashboard() {
   const [currentMonth, setCurrentMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dimensions] = useState({
+    width: Dimensions.get('window').width - 40,
+    height: 220
+  });
 
   useEffect(() => {
     loadDashboard();
@@ -41,6 +70,7 @@ export default function DashboardScreen() {
     try {
       setIsLoading(true);
       const response = await api.get(`/dashboard/${currentMonth}`);
+      console.log('Dashboard Data:', response.data);
       setDashboardData(response.data);
     } catch (error: any) {
       console.error('Error loading dashboard:', error?.response?.data || error.message);
@@ -91,7 +121,7 @@ export default function DashboardScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
         <ThemedText type="title" style={styles.title}>Dashboard</ThemedText>
-
+        
         {/* Month Selector */}
         <ThemedView style={styles.monthSelector}>
           <ThemedText 
@@ -131,97 +161,146 @@ export default function DashboardScreen() {
         {/* Category Breakdown */}
         <ThemedView style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Category Breakdown</ThemedText>
-          {dashboardData.categoryBreakdown.map((category) => {
-            const percentage = (category.amount / dashboardData.totalExpense) * 100;
-            const progressColor = getProgressColor(category.amount, dashboardData.totalExpense);
-            
-            return (
-              <ThemedView key={category.category} style={styles.categoryItem}>
-                <ThemedView style={styles.categoryHeader}>
-                  <ThemedText style={styles.categoryName}>{category.category}</ThemedText>
-                  <ThemedText style={styles.categoryAmount}>
-                    ${category.amount.toFixed(2)}
-                  </ThemedText>
-                </ThemedView>
-                <ThemedView style={styles.progressBarContainer}>
-                  <ThemedView 
-                    style={[
-                      styles.progressBar,
-                      { 
-                        width: `${percentage}%`,
-                        backgroundColor: progressColor
-                      }
-                    ]} 
-                  />
-                </ThemedView>
-                <ThemedText style={[styles.percentageText, { color: progressColor }]}>
-                  {percentage.toFixed(1)}%
-                </ThemedText>
+          {dashboardData.categoryBreakdown && dashboardData.categoryBreakdown.length > 0 ? (
+            <>
+              <PieChart
+                data={dashboardData.categoryBreakdown.map((category) => {
+                  const percentage = (category.amount / dashboardData.totalExpense) * 100;
+                  return {
+                    name: '',  // Remove the name from the chart label
+                    amount: category.amount,
+                    percentage,
+                    color: getRandomColor(category.category),
+                    legendFontColor: '#666',
+                    legendFontSize: 12,
+                  };
+                })}
+                width={dimensions.width}
+                height={220}
+                chartConfig={{
+                  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                }}
+                accessor="amount"
+                backgroundColor="transparent"
+                paddingLeft="0"
+                absolute={false}
+                hasLegend={false}
+                center={[dimensions.width / 4, 0]}
+              />
+              <ThemedView style={styles.categoryList}>
+                {dashboardData.categoryBreakdown.map((category) => {
+                  const percentage = (category.amount / dashboardData.totalExpense) * 100;
+                  const color = getRandomColor(category.category);
+                  
+                  return (
+                    <ThemedView key={category.category} style={styles.categoryItem}>
+                      <ThemedView style={styles.categoryHeader}>
+                        <ThemedView style={styles.categoryLabel}>
+                          <ThemedView style={[styles.categoryDot, { backgroundColor: color }]} />
+                          <ThemedText style={styles.categoryName}>{category.category}</ThemedText>
+                        </ThemedView>
+                        <ThemedText style={[styles.valueText, { color }]}>
+                          ${category.amount.toFixed(2)} ({percentage.toFixed(1)}%)
+                        </ThemedText>
+                      </ThemedView>
+                    </ThemedView>
+                  );
+                })}
               </ThemedView>
-            );
-          })}
+            </>
+          ) : (
+            <ThemedText style={styles.noDataText}>No category data available</ThemedText>
+          )}
         </ThemedView>
 
         {/* Monthly Trends Chart */}
         <ThemedView style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Monthly Trends</ThemedText>
-          <LineChart
-            data={{
-              labels: dashboardData.monthlyTrends.map(trend => 
-                new Date(trend.month + '-01').toLocaleDateString(undefined, { month: 'short' })
-              ),
-              datasets: [
-                {
-                  data: dashboardData.monthlyTrends.map(trend => trend.income),
-                  color: () => '#34C759', // Green for income
-                  strokeWidth: 2
-                },
-                {
-                  data: dashboardData.monthlyTrends.map(trend => trend.expense),
-                  color: () => '#FF3B30', // Red for expense
-                  strokeWidth: 2
-                }
-              ]
-            }}
-            width={Dimensions.get('window').width - 40}
-            height={220}
-            chartConfig={{
-              backgroundColor: '#ffffff',
-              backgroundGradientFrom: '#ffffff',
-              backgroundGradientTo: '#ffffff',
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              style: {
-                borderRadius: 16
-              }
-            }}
-            bezier
-            style={styles.chart}
-          />
-          <ThemedView style={styles.chartLegend}>
-            <ThemedView style={styles.legendItem}>
-              <ThemedView style={[styles.legendDot, { backgroundColor: '#34C759' }]} />
-              <ThemedText style={styles.legendText}>Income</ThemedText>
-            </ThemedView>
-            <ThemedView style={styles.legendItem}>
-              <ThemedView style={[styles.legendDot, { backgroundColor: '#FF3B30' }]} />
-              <ThemedText style={styles.legendText}>Expenses</ThemedText>
-            </ThemedView>
-          </ThemedView>
+          {dashboardData.monthlyTrends && dashboardData.monthlyTrends.length > 0 ? (
+            <>
+              <LineChart
+                data={{
+                  labels: dashboardData.monthlyTrends.map(trend => 
+                    new Date(trend.month + '-01').toLocaleDateString(undefined, { month: 'short' })
+                  ),
+                  datasets: [
+                    {
+                      data: dashboardData.monthlyTrends.map(trend => trend.income || 0),
+                      color: () => '#34C759', // Green for income
+                      strokeWidth: 2
+                    },
+                    {
+                      data: dashboardData.monthlyTrends.map(trend => trend.expense || 0),
+                      color: () => '#FF3B30', // Red for expense
+                      strokeWidth: 2
+                    }
+                  ]
+                }}
+                width={dimensions.width}
+                height={dimensions.height}
+                yAxisLabel="$"
+                yAxisSuffix=""
+                chartConfig={{
+                  backgroundColor: '#ffffff',
+                  backgroundGradientFrom: '#ffffff',
+                  backgroundGradientTo: '#ffffff',
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  propsForDots: {
+                    r: '4',
+                    strokeWidth: '2',
+                  },
+                  propsForLabels: {
+                    fontSize: 12
+                  },
+                  style: {
+                    borderRadius: 16
+                  }
+                }}
+                style={{
+                  marginVertical: 8,
+                  borderRadius: 16,
+                  paddingRight: 40
+                }}
+                bezier
+                withInnerLines={false}
+                withOuterLines={true}
+                fromZero={true}
+              />
+              <ThemedView style={styles.chartLegend}>
+                <ThemedView style={styles.legendItem}>
+                  <ThemedView style={[styles.legendDot, { backgroundColor: '#34C759' }]} />
+                  <ThemedText style={styles.legendText}>Income</ThemedText>
+                </ThemedView>
+                <ThemedView style={styles.legendItem}>
+                  <ThemedView style={[styles.legendDot, { backgroundColor: '#FF3B30' }]} />
+                  <ThemedText style={styles.legendText}>Expenses</ThemedText>
+                </ThemedView>
+              </ThemedView>
+            </>
+          ) : (
+            <ThemedText style={styles.noDataText}>No trend data available</ThemedText>
+          )}
         </ThemedView>
 
         {/* Top Categories */}
         <ThemedView style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Top Spending Categories</ThemedText>
-          {dashboardData.topCategories.map((category, index) => (
-            <ThemedView key={category.category} style={styles.topCategoryItem}>
-              <ThemedText style={styles.topCategoryRank}>#{index + 1}</ThemedText>
-              <ThemedText style={styles.topCategoryName}>{category.category}</ThemedText>
-              <ThemedText style={styles.topCategoryAmount}>
-                ${category.amount.toFixed(2)}
-              </ThemedText>
-            </ThemedView>
-          ))}
+          {dashboardData.topCategories && dashboardData.topCategories.length > 0 ? (
+            dashboardData.topCategories.map((category, index) => (
+              <ThemedView key={category.category} style={styles.topCategoryItem}>
+                <ThemedText style={styles.topCategoryRank}>#{index + 1}</ThemedText>
+                <ThemedText style={styles.topCategoryName}>{category.category}</ThemedText>
+                <ThemedText style={styles.topCategoryAmount}>
+                  ${category.amount.toFixed(2)}
+                </ThemedText>
+              </ThemedView>
+            ))
+          ) : (
+            <ThemedText style={styles.noDataText}>No top categories data available</ThemedText>
+          )}
         </ThemedView>
       </ScrollView>
     </SafeAreaView>
@@ -311,39 +390,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 15,
   },
+  categoryList: {
+    marginTop: 20,
+  },
   categoryItem: {
     marginBottom: 15,
   },
   categoryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 5,
+  },
+  categoryLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  categoryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   categoryName: {
     fontSize: 16,
+    flex: 1,
   },
-  categoryAmount: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 5,
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  percentageText: {
+  valueText: {
     fontSize: 14,
-    textAlign: 'right',
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
+    fontWeight: '500',
   },
   chartLegend: {
     flexDirection: 'row',
@@ -364,6 +440,12 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 14,
     color: '#666',
+  },
+  noDataText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+    marginVertical: 20,
   },
   topCategoryItem: {
     flexDirection: 'row',
