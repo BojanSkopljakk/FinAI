@@ -6,7 +6,7 @@ const api = axios.create({
   baseURL:
     Platform.OS === 'web'
       ? 'https://localhost:7007/api' // for web
-      : 'https://5b25-109-245-67-202.ngrok-free.app/api', // for Android emulator
+      : 'https://d511-109-245-67-202.ngrok-free.app/api', // for Android emulator
 });
 
 // Add request interceptor to include the token

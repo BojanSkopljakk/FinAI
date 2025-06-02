@@ -20,6 +20,8 @@ const MAPPING = {
   'chevron.right': 'chevron-right',
   'dollarsign.circle.fill': 'account-balance-wallet',
   'gear': 'settings',
+  'chart.pie.fill': 'pie-chart',
+  'chart.bar.fill': 'bar-chart',
 } as IconMapping;
 
 /**
