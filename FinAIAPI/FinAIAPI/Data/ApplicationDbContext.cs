@@ -13,6 +13,9 @@ namespace FinAIAPI.Data
 
         public DbSet<SavingGoal> SavingGoals { get; set; }
 
+        public DbSet<Notification> Notifications { get; set; }
+
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -22,6 +25,10 @@ namespace FinAIAPI.Data
             modelBuilder.Entity<Transaction>()
                 .Property(t => t.Amount)
                 .HasPrecision(18, 2); // Adjust as needed
+
+            modelBuilder.Entity<Notification>()
+    .HasIndex(n => new { n.UserId, n.UniqueKey })
+    .IsUnique();
         }
 
 

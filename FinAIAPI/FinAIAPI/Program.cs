@@ -48,6 +48,8 @@ builder.Services.AddCors(options =>
 
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+
 builder.Services.AddAuthorization();
 
 

@@ -1,6 +1,7 @@
 ﻿using FinAIAPI.Data;
 using FinAIAPI.DTOs;
 using FinAIAPI.Models;
+using FinAIAPI.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +14,12 @@ namespace FinAIAPI.Controllers
     public class BudgetsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public BudgetsController(ApplicationDbContext context)
+        public BudgetsController(ApplicationDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         [HttpPost]
@@ -85,6 +88,21 @@ namespace FinAIAPI.Controllers
                 foreach (var budget in budgets)
                 {
                     budget.Spent = spentPerCategory.FirstOrDefault(s => s.Category == budget.Category)?.Spent ?? 0;
+                    var percentSpent = (budget.Spent / budget.Amount) * 100;
+
+                    if (percentSpent >= 90)
+                    {
+                        await _notificationService.CreateNotificationAsync(userId,
+                            $"⚠️ You've spent {percentSpent:F0}% of your {budget.Category} budget for {month}.",
+                            $"budget-{month}-{budget.Category}-90");
+                    }
+                    else if (percentSpent >= 75)
+                    {
+                        await _notificationService.CreateNotificationAsync(userId,
+                            $"🔔 You're at {percentSpent:F0}% of your {budget.Category} budget for {month}.",
+                            $"budget-{month}-{budget.Category}-75");
+                    }
+
                 }
 
                 return Ok(budgets);

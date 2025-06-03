@@ -23,6 +23,7 @@ const MAPPING = {
   'chart.pie.fill': 'pie-chart',
   'chart.bar.fill': 'bar-chart',
   'banknote.fill': 'account-balance',
+  'bell.fill': 'notifications',
 } as IconMapping;
 
 /**

@@ -1,6 +1,7 @@
 ﻿using FinAIAPI.Data;
 using FinAIAPI.DTOs;
 using FinAIAPI.Models;
+using FinAIAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,10 +16,12 @@ namespace FinAIAPI.Controllers
     public class SavingGoalsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public SavingGoalsController(ApplicationDbContext context)
+        public SavingGoalsController(ApplicationDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         [HttpPost]
@@ -45,12 +48,32 @@ namespace FinAIAPI.Controllers
         public async Task<IActionResult> GetGoals()
         {
             var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
             var goals = await _context.SavingGoals
                 .Where(g => g.UserId == userId)
                 .ToListAsync();
 
+            foreach (var goal in goals)
+            {
+                var percentSaved = goal.CurrentAmount / goal.TargetAmount * 100;
+
+                if (percentSaved >= 100)
+                {
+                    await _notificationService.CreateNotificationAsync(userId,
+                        $"🎉 You've reached your saving goal: {goal.Title}!",
+                        $"savings-{goal.Id}-100");
+                }
+                else if (percentSaved >= 75)
+                {
+                    await _notificationService.CreateNotificationAsync(userId,
+                        $"💰 You're {percentSaved:F0}% of the way to your goal: {goal.Title}.",
+                        $"savings-{goal.Id}-75");
+                }
+            }
+
             return Ok(goals);
         }
+
 
         [HttpPut("{id}/contribute")]
         public async Task<IActionResult> ContributeToGoal(int id, [FromBody] decimal amount)
