@@ -22,6 +22,7 @@ const MAPPING = {
   'gear': 'settings',
   'chart.pie.fill': 'pie-chart',
   'chart.bar.fill': 'bar-chart',
+  'banknote.fill': 'account-balance',
 } as IconMapping;
 
 /**
