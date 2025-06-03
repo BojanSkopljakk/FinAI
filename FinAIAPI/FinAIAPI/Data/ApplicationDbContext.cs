@@ -11,6 +11,9 @@ namespace FinAIAPI.Data
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<Budget> Budgets { get; set; }
 
+        public DbSet<SavingGoal> SavingGoals { get; set; }
+
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
