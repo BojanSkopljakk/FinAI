@@ -1,11 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Alert, Dimensions, FlatList, Modal, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import api from '@/lib/api';
+
+const { width } = Dimensions.get('window');
 
 type Budget = {
   id: number;
@@ -16,15 +24,32 @@ type Budget = {
   spent: number;
 };
 
-const CATEGORIES = [
-  'Food',
-  'Transportation',
-  'Housing',
-  'Utilities',
-  'Entertainment',
-  'Healthcare',
-  'Shopping',
-  'Other'
+type CategoryStyle = {
+  icon: IconSymbolName;
+  color: string;
+};
+
+type CategoryStylesMap = {
+  [key: string]: CategoryStyle;
+};
+
+// Category icons and colors mapping (matching transactions screen)
+const CATEGORY_STYLES: CategoryStylesMap = {
+  Food: { icon: 'cart.fill', color: '#FF6B6B' },
+  Transportation: { icon: 'car.fill', color: '#4ECDC4' },
+  Housing: { icon: 'house.fill', color: '#45B7D1' },
+  Utilities: { icon: 'bolt.fill', color: '#96CEB4' },
+  Entertainment: { icon: 'film.fill', color: '#D4A5A5' },
+  Healthcare: { icon: 'heart.fill', color: '#FF9999' },
+  Shopping: { icon: 'bag.fill', color: '#9B89B3' },
+  Other: { icon: 'ellipsis.circle.fill', color: '#A0A0A0' }
+};
+
+const CATEGORIES = Object.keys(CATEGORY_STYLES);
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
 export default function BudgetScreen() {
@@ -36,6 +61,8 @@ export default function BudgetScreen() {
   const [currentMonth, setCurrentMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
+
+  const colorScheme = useColorScheme();
 
   useEffect(() => {
     loadBudgets();
@@ -238,68 +265,213 @@ export default function BudgetScreen() {
     );
   };
 
-  const renderBudgetItem = ({ item }: { item: Budget }) => {
+  const getTotalBudget = () => budgets.reduce((sum, budget) => sum + budget.amount, 0);
+  const getTotalSpent = () => budgets.reduce((sum, budget) => sum + budget.spent, 0);
+  
+  const getFormattedMonth = (dateString: string) => {
+    const [year, month] = dateString.split('-');
+    return `${MONTHS[parseInt(month) - 1]} ${year}`;
+  };
+
+  const MonthSelector = () => (
+    <Animated.View 
+      entering={FadeInDown.delay(200)}
+      style={styles.monthSelector}
+    >
+      <Pressable
+        style={styles.monthButton}
+        onPress={() => navigateMonth('prev')}>
+        <IconSymbol
+          name="chevron.left.forwardslash.chevron.right"
+          size={20}
+          color={Colors[colorScheme ?? 'light'].text}
+          style={{ transform: [{ rotate: '180deg' }] }}
+        />
+      </Pressable>
+      <ThemedText style={styles.monthText}>
+        {getFormattedMonth(currentMonth)}
+      </ThemedText>
+      <Pressable
+        style={styles.monthButton}
+        onPress={() => navigateMonth('next')}>
+        <IconSymbol
+          name="chevron.left.forwardslash.chevron.right"
+          size={20}
+          color={Colors[colorScheme ?? 'light'].text}
+        />
+      </Pressable>
+    </Animated.View>
+  );
+
+  const BudgetSummary = () => {
+    const totalBudget = getTotalBudget();
+    const totalSpent = getTotalSpent();
+    const percentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+    
+    return (
+      <Animated.View
+        entering={FadeInDown.delay(400)}
+        style={styles.summaryContainer}
+      >
+        <LinearGradient
+          colors={colorScheme === 'dark' ? 
+            ['#1A1A1C', '#2C2C2E'] : 
+            ['#FFFFFF', '#F2F2F7']
+          }
+          style={styles.summaryGradient}
+        >
+          <ThemedText style={styles.summaryTitle}>Monthly Overview</ThemedText>
+          <ThemedView style={styles.summaryRow}>
+            <ThemedView style={styles.summaryItem}>
+              <ThemedText style={styles.summaryLabel}>Total Budget</ThemedText>
+              <ThemedText style={styles.summaryAmount}>${totalBudget.toFixed(2)}</ThemedText>
+            </ThemedView>
+            <ThemedView style={styles.summaryItem}>
+              <ThemedText style={styles.summaryLabel}>Total Spent</ThemedText>
+              <ThemedText style={[
+                styles.summaryAmount,
+                { color: getProgressColor(totalSpent, totalBudget) }
+              ]}>${totalSpent.toFixed(2)}</ThemedText>
+            </ThemedView>
+          </ThemedView>
+          <ThemedView style={styles.summaryProgressContainer}>
+            <ThemedView style={styles.summaryProgress}>
+              <Animated.View
+                style={[
+                  styles.summaryProgressFill,
+                  { 
+                    width: `${Math.min(percentage, 100)}%`,
+                    backgroundColor: getProgressColor(totalSpent, totalBudget)
+                  }
+                ]}
+              />
+            </ThemedView>
+            <ThemedText style={styles.summaryPercentage}>
+              {percentage.toFixed(1)}% used
+            </ThemedText>
+          </ThemedView>
+        </LinearGradient>
+      </Animated.View>
+    );
+  };
+
+  const renderRightActions = (budgetId: number) => {
+    return (
+      <ThemedView style={styles.swipeActions}>
+        <Pressable
+          style={[styles.swipeAction, styles.deleteAction]}
+          onPress={() => handleDelete(budgetId)}>
+          <IconSymbol
+            name="xmark.circle.fill"
+            size={24}
+            color="#FFFFFF"
+          />
+          <ThemedText style={styles.swipeActionText}>Delete</ThemedText>
+        </Pressable>
+      </ThemedView>
+    );
+  };
+
+  const renderBudgetItem = ({ item, index }: { item: Budget; index: number }) => {
     const percentage = Math.min((item.spent / item.amount) * 100, 100);
     const progressColor = getProgressColor(item.spent, item.amount);
+    const categoryStyle = CATEGORY_STYLES[item.category as keyof typeof CATEGORY_STYLES];
 
     return (
-      <Pressable
-        onLongPress={() => handleDelete(item.id)}
-        style={({ pressed }) => [
-          styles.budgetItem,
-          pressed && styles.budgetItemPressed
-        ]}>
-        <ThemedView style={styles.budgetHeader}>
-          <ThemedText style={styles.categoryText}>{item.category}</ThemedText>
-          <ThemedText style={styles.amountText}>
-            ${item.spent.toFixed(2)} / ${item.amount.toFixed(2)}
-          </ThemedText>
-        </ThemedView>
+      <Animated.View
+        entering={FadeInRight.delay(index * 100)}
+      >
+        <Swipeable
+          renderRightActions={() => renderRightActions(item.id)}
+          friction={2}
+          rightThreshold={40}
+        >
+          <Pressable
+            style={({ pressed }) => [
+              styles.budgetItem,
+              pressed && styles.budgetItemPressed
+            ]}
+          >
+            <LinearGradient
+              colors={[
+                colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
+                colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF'
+              ]}
+              style={styles.budgetItemGradient}
+            >
+              <ThemedView style={styles.budgetItemHeader}>
+                <ThemedView style={styles.categoryContainer}>
+                  <ThemedView style={[styles.categoryIcon, { backgroundColor: categoryStyle.color + '20' }]}>
+                    <IconSymbol
+                      name={categoryStyle.icon}
+                      size={24}
+                      color={categoryStyle.color}
+                    />
+                  </ThemedView>
+                  <ThemedText style={styles.categoryText}>{item.category}</ThemedText>
+                </ThemedView>
+                <ThemedView style={styles.amountContainer}>
+                  <ThemedText style={styles.spentText}>
+                    ${item.spent.toFixed(2)}
+                  </ThemedText>
+                  <ThemedText style={styles.budgetText}>
+                    / ${item.amount.toFixed(2)}
+                  </ThemedText>
+                </ThemedView>
+              </ThemedView>
 
-        <ThemedView style={styles.progressBarContainer}>
-          <ThemedView 
-            style={[
-              styles.progressBar, 
-              { 
-                width: `${percentage}%`,
-                backgroundColor: progressColor
-              }
-            ]} 
+              <ThemedView style={styles.progressContainer}>
+                <ThemedView style={styles.progressBar}>
+                  <Animated.View
+                    style={[
+                      styles.progressFill,
+                      { 
+                        width: `${percentage}%`,
+                        backgroundColor: progressColor
+                      }
+                    ]}
+                  />
+                </ThemedView>
+                <ThemedText style={[styles.percentageText, { color: progressColor }]}>
+                  {percentage.toFixed(1)}%
+                </ThemedText>
+              </ThemedView>
+            </LinearGradient>
+          </Pressable>
+        </Swipeable>
+      </Animated.View>
+    );
+  };
+
+  const renderCategoryItem = ({ item }: { item: string }) => {
+    const categoryStyle = CATEGORY_STYLES[item as keyof typeof CATEGORY_STYLES];
+    
+    return (
+      <Pressable
+        style={[
+          styles.categoryItem,
+          selectedCategory === item && styles.selectedCategory
+        ]}
+        onPress={() => setSelectedCategory(item)}>
+        <ThemedView style={[
+          styles.categoryIcon,
+          { backgroundColor: categoryStyle.color + '20' }
+        ]}>
+          <IconSymbol
+            name={categoryStyle.icon}
+            size={24}
+            color={categoryStyle.color}
           />
         </ThemedView>
-
-        <ThemedText style={[styles.percentageText, { color: progressColor }]}>
-          {percentage.toFixed(1)}%
-        </ThemedText>
-
-        {percentage >= 90 && (
-          <ThemedText style={styles.warningText}>
-            Warning: Budget nearly exceeded!
-          </ThemedText>
-        )}
-
-        <ThemedText style={styles.deleteHint}>
-          Long press to delete
+        <ThemedText style={[
+          styles.categoryItemText,
+          selectedCategory === item && styles.selectedCategoryText
+        ]}>
+          {item}
         </ThemedText>
       </Pressable>
     );
   };
-
-  const renderCategoryItem = ({ item }: { item: string }) => (
-    <Pressable
-      style={[
-        styles.categoryItem,
-        selectedCategory === item && styles.selectedCategory
-      ]}
-      onPress={() => setSelectedCategory(item)}>
-      <ThemedText style={[
-        styles.categoryItemText,
-        selectedCategory === item && styles.selectedCategoryText
-      ]}>
-        {item}
-      </ThemedText>
-    </Pressable>
-  );
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     const date = new Date(currentMonth + '-01');
@@ -314,47 +486,44 @@ export default function BudgetScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.title}>Budget</ThemedText>
+        <MonthSelector />
+        <BudgetSummary />
 
-        <ThemedView style={styles.monthSelector}>
-          <Pressable onPress={() => navigateMonth('prev')}>
-            <ThemedText style={styles.monthNavButton}>←</ThemedText>
-          </Pressable>
-          <ThemedText style={styles.monthText}>
-            {new Date(currentMonth + '-01').toLocaleDateString(undefined, { 
-              month: 'long', 
-              year: 'numeric' 
-            })}
-          </ThemedText>
-          <Pressable onPress={() => navigateMonth('next')}>
-            <ThemedText style={styles.monthNavButton}>→</ThemedText>
-          </Pressable>
-        </ThemedView>
+        <Animated.View
+          entering={FadeInDown.delay(600)}
+          style={styles.listContainer}
+        >
+          <ThemedText style={styles.sectionTitle}>Category Budgets</ThemedText>
+          <FlatList
+            data={budgets}
+            renderItem={renderBudgetItem}
+            keyExtractor={(item) => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <ThemedText style={styles.emptyText}>
+                {isLoading ? 'Loading budgets...' : 'No budgets set for this month'}
+              </ThemedText>
+            }
+          />
+        </Animated.View>
 
-        <FlatList
-          data={budgets}
-          renderItem={renderBudgetItem}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.list}
-          refreshing={isLoading}
-          onRefresh={loadBudgets}
-          ListEmptyComponent={
-            <ThemedText style={styles.emptyText}>
-              {isLoading ? 'Loading budgets...' : 'No budgets set for this month'}
+        <Animated.View
+          entering={FadeInDown.delay(800)}
+        >
+          <Pressable 
+            style={styles.addButton}
+            onPress={() => setModalVisible(true)}>
+            <IconSymbol
+              name="plus.circle.fill"
+              size={24}
+              color="#FFFFFF"
+            />
+            <ThemedText style={styles.addButtonText}>
+              Add Budget
             </ThemedText>
-          }
-        />
-
-        <Pressable 
-          style={styles.addButton}
-          onPress={() => {
-            resetForm();
-            setModalVisible(true);
-          }}>
-          <ThemedText style={styles.addButtonText}>
-            Set Budget
-          </ThemedText>
-        </Pressable>
+          </Pressable>
+        </Animated.View>
 
         <Modal
           animationType="slide"
@@ -366,29 +535,27 @@ export default function BudgetScreen() {
           }}>
           <ThemedView style={styles.modalContainer}>
             <ThemedView style={styles.modalContent}>
-              <ThemedText style={styles.modalTitle}>Set Monthly Budget</ThemedText>
+              <ThemedText style={styles.modalTitle}>Set Budget</ThemedText>
 
               <ThemedText style={styles.modalLabel}>Category</ThemedText>
               <FlatList
                 data={CATEGORIES}
                 renderItem={renderCategoryItem}
-                keyExtractor={(item) => item}
-                horizontal={false}
+                keyExtractor={item => item}
+                horizontal
+                showsHorizontalScrollIndicator={false}
                 style={styles.categoryList}
               />
 
-              <ThemedText style={styles.modalLabel}>Budget Amount</ThemedText>
-              <ThemedView style={styles.amountInputContainer}>
-                <ThemedText style={styles.currencySymbol}>$</ThemedText>
-                <TextInput
-                  style={styles.amountInput}
-                  placeholder="0.00"
-                  placeholderTextColor="#666"
-                  value={budgetAmount}
-                  onChangeText={setBudgetAmount}
-                  keyboardType="decimal-pad"
-                />
-              </ThemedView>
+              <ThemedText style={styles.modalLabel}>Amount</ThemedText>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter amount"
+                placeholderTextColor="#666"
+                value={budgetAmount}
+                onChangeText={setBudgetAmount}
+                keyboardType="decimal-pad"
+              />
 
               <ThemedView style={styles.modalButtons}>
                 <Pressable 
@@ -421,83 +588,169 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  title: {
-    fontSize: 24,
-    marginBottom: 20,
-    marginTop: 10,
-  },
   monthSelector: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
   },
+  monthButton: {
+    padding: 10,
+  },
   monthText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     marginHorizontal: 20,
   },
-  monthNavButton: {
-    fontSize: 24,
-    padding: 10,
+  summaryContainer: {
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  list: {
-    flex: 1,
+  summaryGradient: {
+    padding: 20,
   },
-  budgetItem: {
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: '#f8f8f8',
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 15,
   },
-  budgetHeader: {
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 15,
+  },
+  summaryItem: {
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginBottom: 4,
+  },
+  summaryAmount: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  summaryProgressContainer: {
+    marginTop: 10,
+  },
+  summaryProgress: {
+    height: 8,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  summaryProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  summaryPercentage: {
+    fontSize: 14,
+    opacity: 0.6,
+    textAlign: 'right',
+  },
+  listContainer: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 15,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  budgetItem: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  budgetItemPressed: {
+    opacity: 0.7,
+  },
+  budgetItemGradient: {
+    padding: 16,
+  },
+  budgetItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   categoryText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  amountText: {
-    fontSize: 16,
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 5,
+  spentText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  budgetText: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginLeft: 4,
+  },
+  progressContainer: {
+    marginTop: 8,
   },
   progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   percentageText: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'right',
   },
   addButton: {
-    backgroundColor: '#0A84FF',
-    padding: 15,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0A84FF',
+    padding: 16,
+    borderRadius: 16,
     marginTop: 10,
   },
   addButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     width: '90%',
     maxWidth: 400,
@@ -514,42 +767,32 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   categoryList: {
-    maxHeight: 200,
     marginBottom: 20,
   },
   categoryItem: {
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 8,
+    alignItems: 'center',
+    marginRight: 15,
+    opacity: 0.7,
   },
   selectedCategory: {
-    backgroundColor: '#0A84FF',
-    borderColor: '#0A84FF',
+    opacity: 1,
   },
   categoryItemText: {
-    fontSize: 16,
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '500',
   },
   selectedCategoryText: {
-    color: '#fff',
+    color: '#0A84FF',
   },
-  amountInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  input: {
+    width: '100%',
+    height: 50,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 12,
+    paddingHorizontal: 15,
     marginBottom: 20,
-    paddingHorizontal: 12,
-  },
-  currencySymbol: {
-    fontSize: 16,
-    marginRight: 5,
-  },
-  amountInput: {
-    flex: 1,
-    height: 50,
     fontSize: 16,
   },
   modalButtons: {
@@ -559,7 +802,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginHorizontal: 5,
   },
@@ -576,23 +819,29 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
+    opacity: 0.6,
     marginTop: 20,
-    color: '#666',
   },
-  warningText: {
-    color: '#FF3B30',
-    fontSize: 12,
-    marginTop: 4,
+  swipeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginLeft: 10,
+  },
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 90,
+    height: '100%',
+    borderRadius: 16,
+  },
+  deleteAction: {
+    backgroundColor: '#FF3B30',
+  },
+  swipeActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '600',
-  },
-  budgetItemPressed: {
-    opacity: 0.7,
-  },
-  deleteHint: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 5,
-    fontStyle: 'italic',
+    marginTop: 4,
   },
 }); 
