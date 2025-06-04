@@ -1,10 +1,14 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
-import { Alert, Dimensions, ScrollView, StyleSheet } from 'react-native';
+import { Alert, Dimensions, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { LineChart, PieChart } from 'react-native-chart-kit';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import api from '@/lib/api';
 
 type CategoryBreakdown = {
@@ -51,7 +55,17 @@ function getRandomColor(key: string): string {
   return colorCache[key];
 }
 
-export default function dashboard() {
+const CATEGORY_ICONS = {
+  'Food & Dining': { icon: 'banknote.fill', color: '#FF9500' },
+  'Shopping': { icon: 'cart.fill', color: '#5856D6' },
+  'Housing': { icon: 'house.fill', color: '#45B7D1' },
+  'Transportation': { icon: 'car.fill', color: '#4ECDC4' },
+  'Entertainment': { icon: 'heart.fill', color: '#FF2D55' },
+  'Healthcare': { icon: 'heart.fill', color: '#FF9999' },
+  'Other': { icon: 'banknote.fill', color: '#A0A0A0' }
+} as const;
+
+export default function Dashboard() {
   const [currentMonth, setCurrentMonth] = useState(
     new Date().toISOString().slice(0, 7)
   );
@@ -61,6 +75,7 @@ export default function dashboard() {
     width: Dimensions.get('window').width - 40,
     height: 220
   });
+  const colorScheme = useColorScheme();
 
   useEffect(() => {
     loadDashboard();
@@ -117,108 +132,209 @@ export default function dashboard() {
     );
   }
 
+  const balance = dashboardData.totalIncome - dashboardData.totalExpense;
+  const savingsRate = (balance / dashboardData.totalIncome) * 100;
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <ThemedText type="title" style={styles.title}>Dashboard</ThemedText>
         
         {/* Month Selector */}
-        <ThemedView style={styles.monthSelector}>
-          <ThemedText 
-            style={styles.monthNavButton}
-            onPress={() => navigateMonth('prev')}>
-            ←
-          </ThemedText>
+        <Animated.View 
+          entering={FadeInDown.delay(100)}
+          style={styles.monthSelector}
+        >
+          <Pressable onPress={() => navigateMonth('prev')}>
+            <IconSymbol
+              name="chevron.left.forwardslash.chevron.right"
+              size={24}
+              color={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+            />
+          </Pressable>
           <ThemedText style={styles.monthText}>
             {new Date(currentMonth + '-01').toLocaleDateString(undefined, { 
               month: 'long', 
               year: 'numeric' 
             })}
           </ThemedText>
-          <ThemedText 
-            style={styles.monthNavButton}
-            onPress={() => navigateMonth('next')}>
-            →
-          </ThemedText>
-        </ThemedView>
+          <Pressable onPress={() => navigateMonth('next')}>
+            <IconSymbol
+              name="chevron.left.forwardslash.chevron.right"
+              size={24}
+              color={colorScheme === 'dark' ? '#FFFFFF' : '#000000'}
+            />
+          </Pressable>
+        </Animated.View>
 
         {/* Summary Cards */}
-        <ThemedView style={styles.summaryContainer}>
-          <ThemedView style={[styles.summaryCard, styles.incomeCard]}>
-            <ThemedText style={styles.summaryLabel}>Income</ThemedText>
+        <Animated.View 
+          entering={FadeInDown.delay(200)}
+          style={styles.summaryContainer}
+        >
+          <LinearGradient
+            colors={colorScheme === 'dark' ? 
+              ['#2C2C2E', '#1C1C1E'] : 
+              ['#F2F2F7', '#FFFFFF']
+            }
+            style={[styles.summaryCard, styles.balanceCard]}
+          >
+            <ThemedText style={styles.summaryLabel}>Balance</ThemedText>
+            <ThemedText style={[styles.summaryAmount, { color: balance >= 0 ? '#34C759' : '#FF3B30' }]}>
+              ${balance.toFixed(2)}
+            </ThemedText>
+            <ThemedText style={styles.savingsRate}>
+              {savingsRate >= 0 ? `+${savingsRate.toFixed(1)}%` : `${savingsRate.toFixed(1)}%`} savings rate
+            </ThemedText>
+          </LinearGradient>
+        </Animated.View>
+
+        <Animated.View 
+          entering={FadeInDown.delay(300)}
+          style={styles.summaryRow}
+        >
+          <LinearGradient
+            colors={colorScheme === 'dark' ? 
+              ['#2C2C2E', '#1C1C1E'] : 
+              ['#F2F2F7', '#FFFFFF']
+            }
+            style={[styles.summaryCard, styles.halfCard]}
+          >
+            <ThemedView style={styles.cardHeader}>
+              <IconSymbol
+                name="arrow.down.circle.fill"
+                size={24}
+                color="#34C759"
+              />
+              <ThemedText style={styles.summaryLabel}>Income</ThemedText>
+            </ThemedView>
             <ThemedText style={[styles.summaryAmount, styles.incomeText]}>
               ${dashboardData.totalIncome.toFixed(2)}
             </ThemedText>
-          </ThemedView>
-          <ThemedView style={[styles.summaryCard, styles.expenseCard]}>
-            <ThemedText style={styles.summaryLabel}>Expenses</ThemedText>
+          </LinearGradient>
+
+          <LinearGradient
+            colors={colorScheme === 'dark' ? 
+              ['#2C2C2E', '#1C1C1E'] : 
+              ['#F2F2F7', '#FFFFFF']
+            }
+            style={[styles.summaryCard, styles.halfCard]}
+          >
+            <ThemedView style={styles.cardHeader}>
+              <IconSymbol
+                name="arrow.up.circle.fill"
+                size={24}
+                color="#FF3B30"
+              />
+              <ThemedText style={styles.summaryLabel}>Expenses</ThemedText>
+            </ThemedView>
             <ThemedText style={[styles.summaryAmount, styles.expenseText]}>
               ${dashboardData.totalExpense.toFixed(2)}
             </ThemedText>
-          </ThemedView>
-        </ThemedView>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Category Breakdown */}
-        <ThemedView style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Category Breakdown</ThemedText>
+        <Animated.View 
+          entering={FadeInDown.delay(400)}
+          style={styles.section}
+        >
+          <ThemedText style={styles.sectionTitle}>Spending by Category</ThemedText>
           {dashboardData.categoryBreakdown && dashboardData.categoryBreakdown.length > 0 ? (
-            <>
+            <LinearGradient
+              colors={colorScheme === 'dark' ? 
+                ['#2C2C2E', '#1C1C1E'] : 
+                ['#F2F2F7', '#FFFFFF']
+              }
+              style={styles.chartCard}
+            >
               <PieChart
                 data={dashboardData.categoryBreakdown.map((category) => {
                   const percentage = (category.amount / dashboardData.totalExpense) * 100;
+                  const categoryInfo = CATEGORY_ICONS[category.category as keyof typeof CATEGORY_ICONS] || CATEGORY_ICONS.Other;
                   return {
-                    name: '',  // Remove the name from the chart label
+                    name: category.category,
                     amount: category.amount,
                     percentage,
-                    color: getRandomColor(category.category),
-                    legendFontColor: '#666',
+                    color: categoryInfo.color,
+                    legendFontColor: colorScheme === 'dark' ? '#FFFFFF' : '#000000',
                     legendFontSize: 12,
                   };
                 })}
-                width={dimensions.width}
+                width={dimensions.width - 32}
                 height={220}
                 chartConfig={{
-                  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  color: (opacity = 1) => `rgba(${colorScheme === 'dark' ? '255, 255, 255' : '0, 0, 0'}, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(${colorScheme === 'dark' ? '255, 255, 255' : '0, 0, 0'}, ${opacity})`,
                 }}
                 accessor="amount"
                 backgroundColor="transparent"
-                paddingLeft="0"
+                paddingLeft="15"
                 absolute={false}
                 hasLegend={false}
-                center={[dimensions.width / 4, 0]}
               />
               <ThemedView style={styles.categoryList}>
                 {dashboardData.categoryBreakdown.map((category) => {
                   const percentage = (category.amount / dashboardData.totalExpense) * 100;
-                  const color = getRandomColor(category.category);
+                  const categoryInfo = CATEGORY_ICONS[category.category as keyof typeof CATEGORY_ICONS] || CATEGORY_ICONS.Other;
                   
                   return (
                     <ThemedView key={category.category} style={styles.categoryItem}>
                       <ThemedView style={styles.categoryHeader}>
                         <ThemedView style={styles.categoryLabel}>
-                          <ThemedView style={[styles.categoryDot, { backgroundColor: color }]} />
+                          <ThemedView style={[styles.categoryIcon, { backgroundColor: categoryInfo.color + '20' }]}>
+                            <IconSymbol
+                              name={categoryInfo.icon}
+                              size={20}
+                              color={categoryInfo.color}
+                            />
+                          </ThemedView>
                           <ThemedText style={styles.categoryName}>{category.category}</ThemedText>
                         </ThemedView>
-                        <ThemedText style={[styles.valueText, { color }]}>
-                          ${category.amount.toFixed(2)} ({percentage.toFixed(1)}%)
-                        </ThemedText>
+                        <ThemedView style={styles.categoryValues}>
+                          <ThemedText style={styles.categoryAmount}>
+                            ${category.amount.toFixed(2)}
+                          </ThemedText>
+                          <ThemedText style={[styles.categoryPercentage, { color: categoryInfo.color }]}>
+                            {percentage.toFixed(1)}%
+                          </ThemedText>
+                        </ThemedView>
+                      </ThemedView>
+                      <ThemedView style={styles.progressBar}>
+                        <Animated.View
+                          style={[
+                            styles.progressFill,
+                            { 
+                              width: `${percentage}%`,
+                              backgroundColor: categoryInfo.color
+                            }
+                          ]}
+                        />
                       </ThemedView>
                     </ThemedView>
                   );
                 })}
               </ThemedView>
-            </>
+            </LinearGradient>
           ) : (
             <ThemedText style={styles.noDataText}>No category data available</ThemedText>
           )}
-        </ThemedView>
+        </Animated.View>
 
         {/* Monthly Trends Chart */}
-        <ThemedView style={styles.section}>
+        <Animated.View 
+          entering={FadeInDown.delay(500)}
+          style={styles.section}
+        >
           <ThemedText style={styles.sectionTitle}>Monthly Trends</ThemedText>
           {dashboardData.monthlyTrends && dashboardData.monthlyTrends.length > 0 ? (
-            <>
+            <LinearGradient
+              colors={colorScheme === 'dark' ? 
+                ['#2C2C2E', '#1C1C1E'] : 
+                ['#F2F2F7', '#FFFFFF']
+              }
+              style={styles.chartCard}
+            >
               <LineChart
                 data={{
                   labels: dashboardData.monthlyTrends.map(trend => 
@@ -227,47 +343,56 @@ export default function dashboard() {
                   datasets: [
                     {
                       data: dashboardData.monthlyTrends.map(trend => trend.income || 0),
-                      color: () => '#34C759', // Green for income
-                      strokeWidth: 2
+                      color: () => '#34C759', // Solid green
+                      strokeWidth: 3
                     },
                     {
                       data: dashboardData.monthlyTrends.map(trend => trend.expense || 0),
-                      color: () => '#FF3B30', // Red for expense
-                      strokeWidth: 2
+                      color: () => '#FF3B30', // Solid red
+                      strokeWidth: 3
                     }
                   ]
                 }}
-                width={dimensions.width}
-                height={dimensions.height}
+                width={dimensions.width - 32}
+                height={220}
                 yAxisLabel="$"
                 yAxisSuffix=""
                 chartConfig={{
-                  backgroundColor: '#ffffff',
-                  backgroundGradientFrom: '#ffffff',
-                  backgroundGradientTo: '#ffffff',
+                  backgroundColor: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+                  backgroundGradientFrom: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
+                  backgroundGradientTo: colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF',
                   decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                  propsForDots: {
-                    r: '4',
-                    strokeWidth: '2',
-                  },
-                  propsForLabels: {
-                    fontSize: 12
-                  },
+                  color: () => colorScheme === 'dark' ? '#FFFFFF' : '#000000',
+                  labelColor: () => colorScheme === 'dark' ? '#FFFFFF' : '#000000',
                   style: {
                     borderRadius: 16
-                  }
-                }}
-                style={{
-                  marginVertical: 8,
-                  borderRadius: 16,
-                  paddingRight: 40
+                  },
+                  propsForDots: {
+                    r: "6",
+                    strokeWidth: "2",
+                    stroke: colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7'
+                  },
+                  propsForLabels: {
+                    fontSize: 12,
+                    fontWeight: '600'
+                  },
+                  propsForVerticalLabels: {
+                    fontSize: 12,
+                    fontWeight: '600'
+                  },
+                  strokeWidth: 3,
+                  useShadowColorFromDataset: false
                 }}
                 bezier
-                withInnerLines={false}
-                withOuterLines={true}
+                withVerticalLines={false}
+                withHorizontalLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
                 fromZero={true}
+                style={{
+                  marginVertical: 8,
+                  borderRadius: 16
+                }}
               />
               <ThemedView style={styles.chartLegend}>
                 <ThemedView style={styles.legendItem}>
@@ -279,29 +404,11 @@ export default function dashboard() {
                   <ThemedText style={styles.legendText}>Expenses</ThemedText>
                 </ThemedView>
               </ThemedView>
-            </>
+            </LinearGradient>
           ) : (
             <ThemedText style={styles.noDataText}>No trend data available</ThemedText>
           )}
-        </ThemedView>
-
-        {/* Top Categories */}
-        <ThemedView style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Top Spending Categories</ThemedText>
-          {dashboardData.topCategories && dashboardData.topCategories.length > 0 ? (
-            dashboardData.topCategories.map((category, index) => (
-              <ThemedView key={category.category} style={styles.topCategoryItem}>
-                <ThemedText style={styles.topCategoryRank}>#{index + 1}</ThemedText>
-                <ThemedText style={styles.topCategoryName}>{category.category}</ThemedText>
-                <ThemedText style={styles.topCategoryAmount}>
-                  ${category.amount.toFixed(2)}
-                </ThemedText>
-              </ThemedView>
-            ))
-          ) : (
-            <ThemedText style={styles.noDataText}>No top categories data available</ThemedText>
-          )}
-        </ThemedView>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -316,65 +423,58 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
+    fontWeight: '700',
     marginBottom: 20,
-    marginTop: 10,
-  },
-  loadingText: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorText: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 16,
-    color: '#FF3B30',
   },
   monthSelector: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
   monthText: {
     fontSize: 18,
     fontWeight: '600',
-    marginHorizontal: 20,
-  },
-  monthNavButton: {
-    fontSize: 24,
-    padding: 10,
   },
   summaryContainer: {
+    marginBottom: 16,
+  },
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   summaryCard: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 12,
-    marginHorizontal: 5,
-    backgroundColor: '#f8f8f8',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 0,
   },
-  incomeCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#34C759',
+  balanceCard: {
+    marginBottom: 16,
   },
-  expenseCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF3B30',
+  halfCard: {
+    width: '48%',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
+    opacity: 0.7,
+    marginLeft: 8,
   },
   summaryAmount: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '600',
+    marginTop: 4,
+  },
+  savingsRate: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginTop: 4,
   },
   incomeText: {
     color: '#34C759',
@@ -383,90 +483,101 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
   },
   section: {
-    marginBottom: 25,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 15,
+    marginBottom: 16,
+  },
+  chartCard: {
+    borderRadius: 16,
+    padding: 16,
+    overflow: 'hidden',
   },
   categoryList: {
-    marginTop: 20,
+    marginTop: 16,
   },
   categoryItem: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
   categoryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   categoryLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
-  categoryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
+  categoryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   categoryName: {
     fontSize: 16,
-    flex: 1,
+    fontWeight: '500',
   },
-  valueText: {
+  categoryValues: {
+    alignItems: 'flex-end',
+  },
+  categoryAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  categoryPercentage: {
     fontSize: 14,
     fontWeight: '500',
+    marginTop: 2,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   chartLegend: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 16,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 10,
+    marginHorizontal: 12,
   },
   legendDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: 5,
+    marginRight: 8,
   },
   legendText: {
     fontSize: 14,
-    color: '#666',
+  },
+  loadingText: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
+  },
+  errorText: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
+    color: '#FF3B30',
   },
   noDataText: {
     textAlign: 'center',
-    color: '#666',
-    fontSize: 14,
-    marginVertical: 20,
-  },
-  topCategoryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  topCategoryRank: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 10,
-    color: '#666',
-  },
-  topCategoryName: {
-    flex: 1,
-    fontSize: 16,
-  },
-  topCategoryAmount: {
-    fontSize: 16,
-    fontWeight: '600',
+    opacity: 0.6,
+    marginTop: 20,
   },
 }); 
