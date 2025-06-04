@@ -1,18 +1,12 @@
 // Fallback for using MaterialIcons on Android and web.
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolViewProps, SymbolWeight } from 'expo-symbols';
+import { SymbolWeight } from 'expo-symbols';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
-type IconSymbolName = keyof typeof MAPPING;
+type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 
-/**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
- */
 const MAPPING = {
   'house.fill': 'home',
   'paperplane.fill': 'send',
@@ -24,7 +18,26 @@ const MAPPING = {
   'chart.bar.fill': 'bar-chart',
   'banknote.fill': 'account-balance',
   'bell.fill': 'notifications',
-} as IconMapping;
+  'cart.fill': 'shopping-cart',
+  'car.fill': 'directions-car',
+  'bolt.fill': 'flash-on',
+  'film.fill': 'movie',
+  'heart.fill': 'favorite',
+  'bag.fill': 'shopping-bag',
+  'ellipsis.circle.fill': 'more-horiz',
+  'briefcase.fill': 'work',
+  'chart.line.uptrend.xyaxis.fill': 'trending-up',
+  'gift.fill': 'card-giftcard',
+  'plus.circle.fill': 'add-circle',
+  'minus.circle.fill': 'remove-circle',
+  'list.bullet': 'list',
+  'arrow.down.circle.fill': 'arrow-circle-down',
+  'arrow.up.circle.fill': 'arrow-circle-up',
+  'calendar': 'calendar-today',
+  'xmark.circle.fill': 'cancel',
+} as const;
+
+export type IconSymbolName = keyof typeof MAPPING;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.

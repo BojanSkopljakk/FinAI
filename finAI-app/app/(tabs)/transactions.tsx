@@ -1,11 +1,14 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Alert, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/IconSymbol';
 import api from '@/lib/api';
 import { useTransaction } from '../context/TransactionContext';
 
@@ -16,6 +19,37 @@ type Transaction = {
   description: string;
   category: string;
   date: string;
+};
+
+type CategoryStyle = {
+  icon: IconSymbolName;
+  color: string;
+};
+
+type CategoryStyles = {
+  expense: Record<string, CategoryStyle>;
+  income: Record<string, CategoryStyle>;
+};
+
+// Category icons and colors mapping
+const CATEGORY_STYLES: CategoryStyles = {
+  expense: {
+    Food: { icon: 'cart.fill', color: '#FF6B6B' },
+    Transportation: { icon: 'car.fill', color: '#4ECDC4' },
+    Housing: { icon: 'house.fill', color: '#45B7D1' },
+    Utilities: { icon: 'bolt.fill', color: '#96CEB4' },
+    Entertainment: { icon: 'film.fill', color: '#D4A5A5' },
+    Healthcare: { icon: 'heart.fill', color: '#FF9999' },
+    Shopping: { icon: 'bag.fill', color: '#9B89B3' },
+    Other: { icon: 'ellipsis.circle.fill', color: '#A0A0A0' }
+  },
+  income: {
+    Salary: { icon: 'dollarsign.circle.fill', color: '#4CAF50' },
+    Freelance: { icon: 'briefcase.fill', color: '#2196F3' },
+    Investments: { icon: 'chart.line.uptrend.xyaxis.fill', color: '#9C27B0' },
+    Gift: { icon: 'gift.fill', color: '#E91E63' },
+    Other: { icon: 'ellipsis.circle.fill', color: '#A0A0A0' }
+  }
 };
 
 // Predefined categories
@@ -165,16 +199,26 @@ export default function TransactionsScreen() {
   };
 
   const handleFilterStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowFilterStartDate(Platform.OS === 'ios');
+    if (Platform.OS === 'android') {
+      setShowFilterStartDate(false);
+    }
     if (selectedDate) {
-      setFilterStartDate(selectedDate);
+      // Set the time to the start of the day
+      const date = new Date(selectedDate);
+      date.setHours(0, 0, 0, 0);
+      setFilterStartDate(date);
     }
   };
 
   const handleFilterEndDateChange = (event: any, selectedDate?: Date) => {
-    setShowFilterEndDate(Platform.OS === 'ios');
+    if (Platform.OS === 'android') {
+      setShowFilterEndDate(false);
+    }
     if (selectedDate) {
-      setFilterEndDate(selectedDate);
+      // Set the time to the end of the day
+      const date = new Date(selectedDate);
+      date.setHours(23, 59, 59, 999);
+      setFilterEndDate(date);
     }
   };
 
@@ -227,27 +271,62 @@ export default function TransactionsScreen() {
     );
   };
 
-  const renderTransaction = ({ item }: { item: Transaction }) => (
-    <Swipeable renderRightActions={() => renderRightActions(item)}>
-      <ThemedView style={styles.transactionItem}>
-        <ThemedView style={styles.transactionHeader}>
-          <ThemedView style={styles.transactionInfo}>
-            <ThemedText style={styles.transactionDescription}>{item.description}</ThemedText>
-            <ThemedText style={styles.categoryText}>{item.category}</ThemedText>
-          </ThemedView>
-          <ThemedText 
-            style={[
-              styles.transactionAmount,
-              { color: item.type === 'income' ? '#34C759' : '#FF3B30' }
-            ]}>
-            {item.type === 'income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
-          </ThemedText>
-        </ThemedView>
-        <ThemedText style={styles.transactionDate}>
-          {new Date(item.date).toLocaleDateString()}
-        </ThemedText>
-      </ThemedView>
-    </Swipeable>
+  const renderTransaction = ({ item, index }: { item: Transaction; index: number }) => (
+    <Animated.View
+      entering={FadeInRight.delay(index * 100)}
+      exiting={FadeOutLeft}
+    >
+      <Swipeable renderRightActions={() => renderRightActions(item)}>
+        <Pressable
+          onPress={() => handleEdit(item)}
+          style={({ pressed }) => [
+            styles.transactionItem,
+            pressed && styles.transactionItemPressed
+          ]}
+        >
+          <LinearGradient
+            colors={[
+              item.type === 'income' ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)',
+              'transparent'
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.transactionGradient}
+          >
+            <View style={styles.transactionIconContainer}>
+              <IconSymbol
+                size={24}
+                name={CATEGORY_STYLES[item.type][item.category]?.icon || 'ellipsis.circle.fill'}
+                color={CATEGORY_STYLES[item.type][item.category]?.color || '#A0A0A0'}
+              />
+            </View>
+            <View style={styles.transactionContent}>
+              <View style={styles.transactionHeader}>
+                <View style={styles.transactionInfo}>
+                  <ThemedText style={styles.transactionDescription}>{item.description}</ThemedText>
+                  <ThemedText style={[
+                    styles.categoryText,
+                    { color: CATEGORY_STYLES[item.type][item.category]?.color }
+                  ]}>
+                    {item.category}
+                  </ThemedText>
+                </View>
+                <ThemedText 
+                  style={[
+                    styles.transactionAmount,
+                    { color: item.type === 'income' ? '#34C759' : '#FF3B30' }
+                  ]}>
+                  {item.type === 'income' ? '+' : '-'}${Math.abs(item.amount).toFixed(2)}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.transactionDate}>
+                {new Date(item.date).toLocaleDateString()}
+              </ThemedText>
+            </View>
+          </LinearGradient>
+        </Pressable>
+      </Swipeable>
+    </Animated.View>
   );
 
   const renderCategoryPicker = () => (
@@ -282,75 +361,180 @@ export default function TransactionsScreen() {
   );
 
   const FilterSection = () => (
-    <ThemedView style={styles.filterSection}>
-      <ThemedView style={styles.filterButtons}>
-        <Pressable
-          style={[styles.filterButton, filterType === 'all' && styles.filterButtonActive]}
-          onPress={() => setFilterType('all')}>
-          <ThemedText style={[styles.filterButtonText, filterType === 'all' && styles.filterButtonTextActive]}>
-            All
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          style={[styles.filterButton, filterType === 'expense' && styles.filterButtonActive]}
-          onPress={() => setFilterType('expense')}>
-          <ThemedText style={[styles.filterButtonText, filterType === 'expense' && styles.filterButtonTextActive]}>
-            Expenses
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          style={[styles.filterButton, filterType === 'income' && styles.filterButtonActive]}
-          onPress={() => setFilterType('income')}>
-          <ThemedText style={[styles.filterButtonText, filterType === 'income' && styles.filterButtonTextActive]}>
-            Income
-          </ThemedText>
-        </Pressable>
-      </ThemedView>
+    <Animated.View 
+      entering={FadeInRight}
+      style={styles.filterSection}
+    >
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScrollView}
+      >
+        <View style={styles.filterButtons}>
+          <Pressable
+            style={[styles.filterButton, filterType === 'all' && styles.filterButtonActive]}
+            onPress={() => setFilterType('all')}>
+            <IconSymbol
+              size={20}
+              name="list.bullet"
+              color={filterType === 'all' ? '#FFFFFF' : '#666666'}
+            />
+            <ThemedText style={[
+              styles.filterButtonText,
+              filterType === 'all' && styles.filterButtonTextActive
+            ]}>
+              All
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            style={[styles.filterButton, filterType === 'expense' && styles.filterButtonActive]}
+            onPress={() => setFilterType('expense')}>
+            <IconSymbol
+              size={20}
+              name="arrow.down.circle.fill"
+              color={filterType === 'expense' ? '#FFFFFF' : '#666666'}
+            />
+            <ThemedText style={[
+              styles.filterButtonText,
+              filterType === 'expense' && styles.filterButtonTextActive
+            ]}>
+              Expenses
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            style={[styles.filterButton, filterType === 'income' && styles.filterButtonActive]}
+            onPress={() => setFilterType('income')}>
+            <IconSymbol
+              size={20}
+              name="arrow.up.circle.fill"
+              color={filterType === 'income' ? '#FFFFFF' : '#666666'}
+            />
+            <ThemedText style={[
+              styles.filterButtonText,
+              filterType === 'income' && styles.filterButtonTextActive
+            ]}>
+              Income
+            </ThemedText>
+          </Pressable>
+        </View>
+      </ScrollView>
 
-      <ThemedView style={styles.dateFilters}>
+      <View style={styles.dateFilters}>
         <Pressable
-          style={styles.dateFilterButton}
+          style={[styles.dateFilterButton, filterStartDate && styles.dateFilterButtonActive]}
           onPress={() => setShowFilterStartDate(true)}>
-          <ThemedText style={styles.dateFilterButtonText}>
+          <IconSymbol
+            size={20}
+            name="calendar"
+            color={filterStartDate ? '#0A84FF' : '#666666'}
+          />
+          <ThemedText style={[
+            styles.dateFilterButtonText,
+            filterStartDate && styles.dateFilterButtonTextActive
+          ]}>
             {filterStartDate ? filterStartDate.toLocaleDateString() : 'Start Date'}
           </ThemedText>
         </Pressable>
         <ThemedText style={styles.dateFilterSeparator}>to</ThemedText>
         <Pressable
-          style={styles.dateFilterButton}
+          style={[styles.dateFilterButton, filterEndDate && styles.dateFilterButtonActive]}
           onPress={() => setShowFilterEndDate(true)}>
-          <ThemedText style={styles.dateFilterButtonText}>
+          <IconSymbol
+            size={20}
+            name="calendar"
+            color={filterEndDate ? '#0A84FF' : '#666666'}
+          />
+          <ThemedText style={[
+            styles.dateFilterButtonText,
+            filterEndDate && styles.dateFilterButtonTextActive
+          ]}>
             {filterEndDate ? filterEndDate.toLocaleDateString() : 'End Date'}
           </ThemedText>
         </Pressable>
-      </ThemedView>
+      </View>
 
       {(filterType !== 'all' || filterStartDate || filterEndDate) && (
-        <Pressable style={styles.clearFiltersButton} onPress={clearFilters}>
+        <Pressable 
+          style={styles.clearFiltersButton}
+          onPress={clearFilters}
+        >
+          <IconSymbol
+            size={20}
+            name="xmark.circle.fill"
+            color="#FFFFFF"
+          />
           <ThemedText style={styles.clearFiltersText}>Clear Filters</ThemedText>
         </Pressable>
       )}
 
-      {showFilterStartDate && (
+      {/* Date Pickers */}
+      {(Platform.OS === 'android' && showFilterStartDate) && (
         <DateTimePicker
-          value={filterStartDate || new Date()}
+          value={filterStartDate ?? new Date()}
           mode="date"
           display="default"
           onChange={handleFilterStartDateChange}
-          maximumDate={filterEndDate || undefined}
+          maximumDate={filterEndDate ?? undefined}
         />
       )}
 
-      {showFilterEndDate && (
+      {(Platform.OS === 'android' && showFilterEndDate) && (
         <DateTimePicker
-          value={filterEndDate || new Date()}
+          value={filterEndDate ?? new Date()}
           mode="date"
           display="default"
           onChange={handleFilterEndDateChange}
-          minimumDate={filterStartDate || undefined}
+          minimumDate={filterStartDate ?? undefined}
         />
       )}
-    </ThemedView>
+
+      {Platform.OS === 'ios' && (
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showFilterStartDate || showFilterEndDate}
+          onRequestClose={() => {
+            setShowFilterStartDate(false);
+            setShowFilterEndDate(false);
+          }}>
+          <ThemedView style={styles.modalContainer}>
+            <ThemedView style={styles.modalContent}>
+              <ThemedText style={styles.modalTitle}>
+                Select {showFilterStartDate ? 'Start' : 'End'} Date
+              </ThemedText>
+              
+              <DateTimePicker
+                value={showFilterStartDate ? (filterStartDate ?? new Date()) : (filterEndDate ?? new Date())}
+                mode="date"
+                display="spinner"
+                onChange={showFilterStartDate ? handleFilterStartDateChange : handleFilterEndDateChange}
+                maximumDate={showFilterStartDate ? (filterEndDate ?? undefined) : undefined}
+                minimumDate={showFilterEndDate ? (filterStartDate ?? undefined) : undefined}
+              />
+
+              <ThemedView style={styles.modalButtons}>
+                <Pressable 
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => {
+                    setShowFilterStartDate(false);
+                    setShowFilterEndDate(false);
+                  }}>
+                  <ThemedText style={styles.modalButtonText}>Cancel</ThemedText>
+                </Pressable>
+                <Pressable 
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={() => {
+                    setShowFilterStartDate(false);
+                    setShowFilterEndDate(false);
+                  }}>
+                  <ThemedText style={styles.modalButtonText}>Done</ThemedText>
+                </Pressable>
+              </ThemedView>
+            </ThemedView>
+          </ThemedView>
+        </Modal>
+      )}
+    </Animated.View>
   );
 
   return (
@@ -374,16 +558,25 @@ export default function TransactionsScreen() {
           }
         />
 
-        <Pressable 
-          style={styles.addButton}
-          onPress={() => {
-            resetForm();
-            setModalVisible(true);
-          }}>
-          <ThemedText style={styles.addButtonText}>
-            Add Transaction
-          </ThemedText>
-        </Pressable>
+        <Animated.View
+          entering={FadeInRight}
+        >
+          <Pressable 
+            style={styles.addButton}
+            onPress={() => {
+              resetForm();
+              setModalVisible(true);
+            }}>
+            <IconSymbol
+              size={24}
+              name="plus.circle.fill"
+              color="#FFFFFF"
+            />
+            <ThemedText style={styles.addButtonText}>
+              Add Transaction
+            </ThemedText>
+          </Pressable>
+        </Animated.View>
 
         <Modal
           animationType="slide"
@@ -516,35 +709,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   transactionItem: {
-    padding: 15,
-    borderRadius: 8,
     marginBottom: 10,
+    borderRadius: 16,
     backgroundColor: '#f8f8f8',
+    overflow: 'hidden',
+  },
+  transactionItemPressed: {
+    opacity: 0.7,
+  },
+  transactionGradient: {
+    flexDirection: 'row',
+    padding: 16,
+  },
+  transactionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  transactionContent: {
+    flex: 1,
   },
   transactionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   transactionInfo: {
     flex: 1,
-    marginRight: 10,
+    marginRight: 12,
   },
   transactionDescription: {
     fontSize: 16,
+    fontWeight: '600',
     marginBottom: 4,
   },
   categoryText: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '500',
   },
   transactionAmount: {
     fontSize: 16,
     fontWeight: '600',
   },
   transactionDate: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
   },
   swipeActions: {
@@ -573,16 +786,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   addButton: {
-    backgroundColor: '#0A84FF',
-    padding: 15,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0A84FF',
+    padding: 16,
+    borderRadius: 16,
     marginTop: 10,
   },
   addButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
   modalContainer: {
     flex: 1,
@@ -692,62 +908,76 @@ const styles = StyleSheet.create({
   filterSection: {
     marginBottom: 20,
   },
+  filterScrollView: {
+    marginBottom: 12,
+  },
   filterButtons: {
     flexDirection: 'row',
-    marginBottom: 10,
+    paddingHorizontal: 4,
   },
   filterButton: {
-    flex: 1,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginHorizontal: 4,
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginHorizontal: 4,
   },
   filterButtonActive: {
     backgroundColor: '#0A84FF',
-    borderColor: '#0A84FF',
   },
   filterButtonText: {
+    marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#666666',
   },
   filterButtonTextActive: {
-    color: '#fff',
+    color: '#FFFFFF',
   },
   dateFilters: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   dateFilterButton: {
     flex: 1,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginHorizontal: 4,
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginHorizontal: 4,
+  },
+  dateFilterButtonActive: {
+    backgroundColor: 'rgba(10,132,255,0.1)',
   },
   dateFilterButtonText: {
+    marginLeft: 8,
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
+  },
+  dateFilterButtonTextActive: {
+    color: '#0A84FF',
+    fontWeight: '600',
   },
   dateFilterSeparator: {
     marginHorizontal: 8,
     color: '#666',
   },
   clearFiltersButton: {
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#FF3B30',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FF3B30',
   },
   clearFiltersText: {
-    color: '#fff',
+    marginLeft: 8,
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
