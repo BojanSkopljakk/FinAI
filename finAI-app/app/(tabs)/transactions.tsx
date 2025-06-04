@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import api from '@/lib/api';
+import { useTransaction } from '../context/TransactionContext';
 
 type Transaction = {
   id: string;
@@ -50,6 +51,7 @@ export default function TransactionsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const { showNewTransactionModal, setShowNewTransactionModal, newTransactionType } = useTransaction();
 
   // Add new filter states
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
@@ -61,6 +63,14 @@ export default function TransactionsScreen() {
   useEffect(() => {
     loadTransactions();
   }, []);
+
+  useEffect(() => {
+    if (showNewTransactionModal) {
+      setTransactionType(newTransactionType);
+      setModalVisible(true);
+      setShowNewTransactionModal(false);
+    }
+  }, [showNewTransactionModal, newTransactionType, setShowNewTransactionModal]);
 
   const loadTransactions = async () => {
     try {

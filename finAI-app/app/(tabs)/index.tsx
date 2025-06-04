@@ -1,14 +1,56 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Dimensions, GestureResponderEvent, Pressable, ScrollView, StyleSheet } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTransaction } from '../context/TransactionContext';
+
+const { width } = Dimensions.get('window');
+
+interface QuickActionProps {
+  icon: 'plus.circle.fill' | 'minus.circle.fill' | 'chart.pie.fill' | 'banknote.fill';
+  title: string;
+  onPress: (event: GestureResponderEvent) => void;
+}
+
+const QuickAction: React.FC<QuickActionProps> = ({ icon, title, onPress }) => {
+  const colorScheme = useColorScheme();
+  return (
+    <Pressable 
+      style={styles.quickAction} 
+      onPress={onPress}
+    >
+      <LinearGradient
+        colors={colorScheme === 'dark' ? 
+          ['#2C2C2E', '#1C1C1E'] : 
+          ['#F2F2F7', '#E5E5EA']
+        }
+        style={styles.quickActionGradient}
+      >
+        <IconSymbol 
+          name={icon} 
+          size={24} 
+          color={Colors[colorScheme ?? 'light'].tint} 
+        />
+        <ThemedText style={styles.quickActionText}>{title}</ThemedText>
+      </LinearGradient>
+    </Pressable>
+  );
+};
 
 export default function HomeScreen() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [balance, setBalance] = useState('$2,450.80'); //implementirati nesto ovde
+  const colorScheme = useColorScheme();
+  const { setShowNewTransactionModal, setNewTransactionType } = useTransaction();
 
   useEffect(() => {
     // Check if user is authenticated
@@ -33,32 +75,105 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ThemedView style={styles.container}>
-        <ThemedText type="title" style={styles.title}>
-          Welcome{userEmail ? `, ${userEmail}` : ''}!
-        </ThemedText>
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
+        <ThemedView style={styles.container}>
+          {/* Hero Section */}
+          <Animated.View 
+            entering={FadeInDown.duration(600)}
+            style={styles.heroSection}
+          >
+            <LinearGradient
+              colors={colorScheme === 'dark' ? 
+                ['#1A1A1C', '#2C2C2E'] : 
+                ['#FFFFFF', '#F2F2F7']
+              }
+              style={styles.heroGradient}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.welcomeText}>
+                Welcome back, {userEmail?.split('@')[0]}
+              </ThemedText>
+              <ThemedText type="title" style={styles.balanceText}>
+                {balance}
+              </ThemedText>
+              <ThemedText style={styles.balanceLabel}>
+                Available Balance
+              </ThemedText>
+            </LinearGradient>
+          </Animated.View>
 
-        <ThemedView style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-            Quick Actions
-          </ThemedText>
-          {/* Add your quick action buttons or cards here */}
-        </ThemedView>
+          {/* Quick Actions */}
+          <Animated.View 
+            entering={FadeInUp.duration(600).delay(200)}
+            style={styles.section}
+          >
+            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+              Quick Actions
+            </ThemedText>
+            <ThemedView style={styles.quickActionsGrid}>
+              <QuickAction 
+                icon="plus.circle.fill" 
+                title="Add Income"
+                onPress={() => {
+                  setNewTransactionType('income');
+                  setShowNewTransactionModal(true);
+                  router.push('/(tabs)/transactions');
+                }}
+              />
+              <QuickAction 
+                icon="minus.circle.fill" 
+                title="Add Expense"
+                onPress={() => {
+                  setNewTransactionType('expense');
+                  setShowNewTransactionModal(true);
+                  router.push('/(tabs)/transactions');
+                }}
+              />
+              <QuickAction 
+                icon="chart.pie.fill" 
+                title="View Budget"
+                onPress={() => router.push('/(tabs)/budget')}
+              />
+              <QuickAction 
+                icon="banknote.fill" 
+                title="Savings"
+                onPress={() => router.push('/(tabs)/savings')}
+              />
+            </ThemedView>
+          </Animated.View>
 
-        <ThemedView style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-            Recent Activity
-          </ThemedText>
-          {/* Add your recent activity list here */}
-        </ThemedView>
+          {/* Recent Activity */}
+          <Animated.View 
+            entering={FadeInUp.duration(600).delay(400)}
+            style={styles.section}
+          >
+            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+              Recent Activity
+            </ThemedText>
+            <ThemedView style={styles.activityList}>
+              {/* Add your recent activity items here */}
+              <ThemedText style={styles.emptyText}>
+                No recent activity
+              </ThemedText>
+            </ThemedView>
+          </Animated.View>
 
-        <ThemedView style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-            Summary
-          </ThemedText>
-          {/* Add your summary content here */}
+          {/* Financial Summary */}
+          <Animated.View 
+            entering={FadeInUp.duration(600).delay(600)}
+            style={styles.section}
+          >
+            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+              Financial Summary
+            </ThemedText>
+            <ThemedView style={styles.summaryGrid}>
+              {/* Add your summary cards here */}
+            </ThemedView>
+          </Animated.View>
         </ThemedView>
-      </ThemedView>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -67,14 +182,35 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     padding: 20,
   },
-  title: {
-    fontSize: 28,
+  heroSection: {
     marginBottom: 30,
-    marginTop: 10,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  heroGradient: {
+    padding: 24,
+    borderRadius: 20,
+  },
+  welcomeText: {
+    fontSize: 16,
+    opacity: 0.8,
+    marginBottom: 8,
+  },
+  balanceText: {
+    fontSize: 36,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  balanceLabel: {
+    fontSize: 14,
+    opacity: 0.6,
   },
   section: {
     marginBottom: 25,
@@ -82,5 +218,40 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     marginBottom: 15,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickAction: {
+    width: (width - 52) / 2,
+    aspectRatio: 1.5,
+  },
+  quickActionGradient: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickActionText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activityList: {
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  emptyText: {
+    textAlign: 'center',
+    opacity: 0.5,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
 });

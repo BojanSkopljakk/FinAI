@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { InAppNotification } from '@/components/InAppNotification';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import TransactionProvider from './context/TransactionContext';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -25,14 +26,16 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <View style={{ flex: 1 }}>
-            <Stack>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <InAppNotification />
-            <StatusBar style="auto" />
-          </View>
+          <TransactionProvider>
+            <View style={{ flex: 1 }}>
+              <Stack>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <InAppNotification />
+              <StatusBar style="auto" />
+            </View>
+          </TransactionProvider>
         </ThemeProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
