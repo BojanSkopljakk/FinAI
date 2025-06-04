@@ -1,19 +1,27 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TextInput,
+  Alert,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import api from '@/lib/api';
+
+const { width } = Dimensions.get('window');
 
 type SavingGoal = {
   id: number;
@@ -23,7 +31,19 @@ type SavingGoal = {
   currentAmount: number;
   deadline?: string;
   createdAt: string;
+  category?: string;
 };
+
+const GOAL_CATEGORIES = {
+  'Emergency Fund': { icon: 'banknote.fill', color: '#FF9500' },
+  'Vacation': { icon: 'paperplane.fill', color: '#5856D6' },
+  'Home': { icon: 'house.fill', color: '#45B7D1' },
+  'Car': { icon: 'car.fill', color: '#4ECDC4' },
+  'Education': { icon: 'chart.pie.fill', color: '#FF2D55' },
+  'Wedding': { icon: 'heart.fill', color: '#FF9999' },
+  'Retirement': { icon: 'chart.pie.fill', color: '#34C759' },
+  'Other': { icon: 'banknote.fill', color: '#A0A0A0' }
+} as const;
 
 export default function SavingsTab() {
   const [goals, setGoals] = useState<SavingGoal[]>([]);
@@ -37,6 +57,8 @@ export default function SavingsTab() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [editingGoal, setEditingGoal] = useState<SavingGoal | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<keyof typeof GOAL_CATEGORIES>('Other');
+  const colorScheme = useColorScheme();
 
   const loadGoals = async () => {
     try {
@@ -150,53 +172,182 @@ export default function SavingsTab() {
     setEditingGoal(null);
   };
 
-  const renderGoal = ({ item }: { item: SavingGoal }) => {
+  const SavingsOverview = () => {
+    const totalSavings = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
+    const totalTargets = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
+    const overallProgress = totalTargets > 0 ? (totalSavings / totalTargets) * 100 : 0;
+
+    return (
+      <Animated.View
+        entering={FadeInDown.delay(200)}
+        style={styles.overviewContainer}
+      >
+        <LinearGradient
+          colors={colorScheme === 'dark' ? 
+            ['#1A1A1C', '#2C2C2E'] : 
+            ['#FFFFFF', '#F2F2F7']
+          }
+          style={styles.overviewGradient}
+        >
+          <ThemedText style={styles.overviewTitle}>Total Savings</ThemedText>
+          <ThemedText style={styles.totalAmount}>${totalSavings.toFixed(2)}</ThemedText>
+          <ThemedView style={styles.overviewRow}>
+            <ThemedView style={styles.overviewItem}>
+              <ThemedText style={styles.overviewLabel}>Target</ThemedText>
+              <ThemedText style={styles.overviewValue}>${totalTargets.toFixed(2)}</ThemedText>
+            </ThemedView>
+            <ThemedView style={styles.overviewItem}>
+              <ThemedText style={styles.overviewLabel}>Progress</ThemedText>
+              <ThemedText style={[
+                styles.overviewValue,
+                { color: overallProgress >= 90 ? '#34C759' : '#0A84FF' }
+              ]}>{overallProgress.toFixed(1)}%</ThemedText>
+            </ThemedView>
+          </ThemedView>
+          <ThemedView style={styles.overviewProgress}>
+            <Animated.View
+              style={[
+                styles.overviewProgressFill,
+                { 
+                  width: `${Math.min(overallProgress, 100)}%`,
+                  backgroundColor: overallProgress >= 90 ? '#34C759' : '#0A84FF'
+                }
+              ]}
+            />
+          </ThemedView>
+        </LinearGradient>
+      </Animated.View>
+    );
+  };
+
+  const renderRightActions = (goalId: number) => {
+    return (
+      <ThemedView style={styles.swipeActions}>
+        <Pressable
+          style={[styles.swipeAction, styles.contributeAction]}
+          onPress={() => handleContribute(goalId)}>
+          <IconSymbol
+            name="plus.circle.fill"
+            size={24}
+            color="#FFFFFF"
+          />
+          <ThemedText style={styles.swipeActionText}>Add</ThemedText>
+        </Pressable>
+        <Pressable
+          style={[styles.swipeAction, styles.deleteAction]}
+          onPress={() => handleDelete(goalId)}>
+          <IconSymbol
+            name="xmark.circle.fill"
+            size={24}
+            color="#FFFFFF"
+          />
+          <ThemedText style={styles.swipeActionText}>Delete</ThemedText>
+        </Pressable>
+      </ThemedView>
+    );
+  };
+
+  const renderGoal = ({ item, index }: { item: SavingGoal; index: number }) => {
     const progress = (item.currentAmount / item.targetAmount) * 100;
     const progressColor = progress >= 90 ? '#34C759' : '#0A84FF';
     const deadline = item.deadline ? new Date(item.deadline).toLocaleDateString() : 'No deadline';
+    const category = (item.category ?? 'Other') as keyof typeof GOAL_CATEGORIES;
+    const categoryStyle = GOAL_CATEGORIES[category];
 
     return (
-      <Pressable
-        onLongPress={() => handleDelete(item.id)}
-        style={({ pressed }) => [
-          styles.goalCard,
-          pressed && styles.goalCardPressed
-        ]}>
-        <ThemedView style={styles.goalHeader}>
-          <ThemedText style={styles.goalTitle}>{item.title}</ThemedText>
-          <ThemedText style={styles.amountText}>
-            ${item.currentAmount.toFixed(2)} / ${item.targetAmount.toFixed(2)}
-          </ThemedText>
-        </ThemedView>
+      <Animated.View
+        entering={FadeInRight.delay(index * 100)}
+      >
+        <Swipeable
+          renderRightActions={() => renderRightActions(item.id)}
+          friction={2}
+          rightThreshold={40}
+        >
+          <Pressable
+            style={({ pressed }) => [
+              styles.goalCard,
+              pressed && styles.goalCardPressed
+            ]}
+          >
+            <LinearGradient
+              colors={[
+                colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
+                colorScheme === 'dark' ? '#1C1C1E' : '#FFFFFF'
+              ]}
+              style={styles.goalGradient}
+            >
+              <ThemedView style={styles.goalHeader}>
+                <ThemedView style={styles.goalTitleContainer}>
+                  <ThemedView style={[styles.categoryIcon, { backgroundColor: categoryStyle.color + '20' }]}>
+                    <IconSymbol
+                      name={categoryStyle.icon}
+                      size={24}
+                      color={categoryStyle.color}
+                    />
+                  </ThemedView>
+                  <ThemedView>
+                    <ThemedText style={styles.goalTitle}>{item.title}</ThemedText>
+                    <ThemedText style={styles.deadlineText}>{deadline}</ThemedText>
+                  </ThemedView>
+                </ThemedView>
+                <ThemedView style={styles.amountContainer}>
+                  <ThemedText style={styles.currentAmount}>
+                    ${item.currentAmount.toFixed(2)}
+                  </ThemedText>
+                  <ThemedText style={styles.targetAmount}>
+                    / ${item.targetAmount.toFixed(2)}
+                  </ThemedText>
+                </ThemedView>
+              </ThemedView>
 
-        <ThemedView style={styles.progressBarContainer}>
-          <ThemedView 
-            style={[
-              styles.progressBar, 
-              { 
-                width: `${Math.min(progress, 100)}%`,
-                backgroundColor: progressColor
-              }
-            ]} 
+              <ThemedView style={styles.progressContainer}>
+                <ThemedView style={styles.progressBar}>
+                  <Animated.View
+                    style={[
+                      styles.progressFill,
+                      { 
+                        width: `${Math.min(progress, 100)}%`,
+                        backgroundColor: progressColor
+                      }
+                    ]}
+                  />
+                </ThemedView>
+                <ThemedText style={[styles.percentageText, { color: progressColor }]}>
+                  {progress.toFixed(1)}%
+                </ThemedText>
+              </ThemedView>
+            </LinearGradient>
+          </Pressable>
+        </Swipeable>
+      </Animated.View>
+    );
+  };
+
+  const renderCategoryItem = ({ item }: { item: keyof typeof GOAL_CATEGORIES }) => {
+    const categoryStyle = GOAL_CATEGORIES[item];
+    
+    return (
+      <Pressable
+        style={[
+          styles.categoryItem,
+          selectedCategory === item && styles.selectedCategory
+        ]}
+        onPress={() => setSelectedCategory(item)}>
+        <ThemedView style={[
+          styles.categoryIcon,
+          { backgroundColor: categoryStyle.color + '20' }
+        ]}>
+          <IconSymbol
+            name={categoryStyle.icon}
+            size={24}
+            color={categoryStyle.color}
           />
         </ThemedView>
-
-        <ThemedText style={[styles.percentageText, { color: progressColor }]}>
-          {progress.toFixed(1)}%
-        </ThemedText>
-
-        <ThemedText style={styles.deadlineText}>Deadline: {deadline}</ThemedText>
-
-        <ThemedView style={styles.actionButtons}>
-          <Pressable
-            style={[styles.actionButton, styles.contributeButton]}
-            onPress={() => handleContribute(item.id)}>
-            <ThemedText style={styles.actionButtonText}>Contribute</ThemedText>
-          </Pressable>
-        </ThemedView>
-
-        <ThemedText style={styles.deleteHint}>
-          Long press to delete
+        <ThemedText style={[
+          styles.categoryItemText,
+          selectedCategory === item && styles.selectedCategoryText
+        ]}>
+          {item}
         </ThemedText>
       </Pressable>
     );
@@ -207,30 +358,45 @@ export default function SavingsTab() {
       <ThemedView style={styles.container}>
         <ThemedText type="title" style={styles.title}>Savings Goals</ThemedText>
 
-        <FlatList
-          data={goals}
-          renderItem={renderGoal}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.list}
-          refreshing={isLoading}
-          onRefresh={loadGoals}
-          ListEmptyComponent={
-            <ThemedText style={styles.emptyText}>
-              {isLoading ? 'Loading goals...' : 'No saving goals set'}
-            </ThemedText>
-          }
-        />
+        <SavingsOverview />
 
-        <Pressable 
-          style={styles.addButton}
-          onPress={() => {
-            resetForm();
-            setModalVisible(true);
-          }}>
-          <ThemedText style={styles.addButtonText}>
-            Add New Goal
-          </ThemedText>
-        </Pressable>
+        <Animated.View
+          entering={FadeInDown.delay(400)}
+          style={styles.listContainer}
+        >
+          <FlatList
+            data={goals}
+            renderItem={renderGoal}
+            keyExtractor={(item) => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <ThemedText style={styles.emptyText}>
+                {isLoading ? 'Loading goals...' : 'No saving goals set'}
+              </ThemedText>
+            }
+          />
+        </Animated.View>
+
+        <Animated.View
+          entering={FadeInDown.delay(600)}
+        >
+          <Pressable 
+            style={styles.addButton}
+            onPress={() => {
+              resetForm();
+              setModalVisible(true);
+            }}>
+            <IconSymbol
+              name="plus.circle.fill"
+              size={24}
+              color="#FFFFFF"
+            />
+            <ThemedText style={styles.addButtonText}>
+              Add New Goal
+            </ThemedText>
+          </Pressable>
+        </Animated.View>
 
         <Modal
           animationType="slide"
@@ -246,6 +412,16 @@ export default function SavingsTab() {
                 {editingGoal ? 'Edit Goal' : 'Add New Goal'}
               </ThemedText>
 
+              <ThemedText style={styles.modalLabel}>Category</ThemedText>
+              <FlatList
+                data={Object.keys(GOAL_CATEGORIES) as (keyof typeof GOAL_CATEGORIES)[]}
+                renderItem={renderCategoryItem}
+                keyExtractor={item => item}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoryList}
+              />
+
               <ThemedText style={styles.modalLabel}>Title</ThemedText>
               <TextInput
                 style={styles.input}
@@ -256,23 +432,20 @@ export default function SavingsTab() {
               />
 
               <ThemedText style={styles.modalLabel}>Target Amount</ThemedText>
-              <ThemedView style={styles.amountInputContainer}>
-                <ThemedText style={styles.currencySymbol}>$</ThemedText>
-                <TextInput
-                  style={styles.amountInput}
-                  placeholder="0.00"
-                  placeholderTextColor="#666"
-                  value={targetAmount}
-                  onChangeText={setTargetAmount}
-                  keyboardType="decimal-pad"
-                />
-              </ThemedView>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter target amount"
+                placeholderTextColor="#666"
+                value={targetAmount}
+                onChangeText={setTargetAmount}
+                keyboardType="decimal-pad"
+              />
 
               <ThemedText style={styles.modalLabel}>Deadline (Optional)</ThemedText>
               <Pressable
-                style={styles.dateButton}
+                style={styles.input}
                 onPress={() => setShowDatePicker(true)}>
-                <ThemedText style={styles.dateButtonText}>
+                <ThemedText style={deadline ? styles.dateText : styles.datePlaceholder}>
                   {deadline ? deadline.toLocaleDateString() : 'Select deadline'}
                 </ThemedText>
               </Pressable>
@@ -282,13 +455,13 @@ export default function SavingsTab() {
                   value={deadline || new Date()}
                   mode="date"
                   display="default"
-                  minimumDate={new Date()}
                   onChange={(event, selectedDate) => {
                     setShowDatePicker(Platform.OS === 'ios');
                     if (selectedDate) {
                       setDeadline(selectedDate);
                     }
                   }}
+                  minimumDate={new Date()}
                 />
               )}
 
@@ -304,7 +477,9 @@ export default function SavingsTab() {
                 <Pressable 
                   style={[styles.modalButton, styles.saveButton]}
                   onPress={handleSave}>
-                  <ThemedText style={styles.modalButtonText}>Save</ThemedText>
+                  <ThemedText style={styles.modalButtonText}>
+                    {editingGoal ? 'Update' : 'Save'}
+                  </ThemedText>
                 </Pressable>
               </ThemedView>
             </ThemedView>
@@ -318,26 +493,21 @@ export default function SavingsTab() {
           onRequestClose={() => {
             setContributionModalVisible(false);
             setContributionAmount('');
-            setSelectedGoalId(null);
           }}>
           <ThemedView style={styles.modalContainer}>
             <ThemedView style={styles.modalContent}>
-              <ThemedText style={styles.modalTitle}>
-                Add Contribution
-              </ThemedText>
+              <ThemedText style={styles.modalTitle}>Add Contribution</ThemedText>
 
               <ThemedText style={styles.modalLabel}>Amount</ThemedText>
-              <ThemedView style={styles.amountInputContainer}>
-                <ThemedText style={styles.currencySymbol}>$</ThemedText>
-                <TextInput
-                  style={styles.amountInput}
-                  placeholder="0.00"
-                  placeholderTextColor="#666"
-                  value={contributionAmount}
-                  onChangeText={setContributionAmount}
-                  keyboardType="decimal-pad"
-                />
-              </ThemedView>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter amount"
+                placeholderTextColor="#666"
+                value={contributionAmount}
+                onChangeText={setContributionAmount}
+                keyboardType="decimal-pad"
+                autoFocus
+              />
 
               <ThemedView style={styles.modalButtons}>
                 <Pressable 
@@ -345,14 +515,13 @@ export default function SavingsTab() {
                   onPress={() => {
                     setContributionModalVisible(false);
                     setContributionAmount('');
-                    setSelectedGoalId(null);
                   }}>
                   <ThemedText style={styles.modalButtonText}>Cancel</ThemedText>
                 </Pressable>
                 <Pressable 
                   style={[styles.modalButton, styles.saveButton]}
                   onPress={submitContribution}>
-                  <ThemedText style={styles.modalButtonText}>Contribute</ThemedText>
+                  <ThemedText style={styles.modalButtonText}>Add</ThemedText>
                 </Pressable>
               </ThemedView>
             </ThemedView>
@@ -374,98 +543,183 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     marginBottom: 20,
-    marginTop: 10,
   },
-  list: {
+  overviewContainer: {
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  overviewGradient: {
+    padding: 20,
+    paddingTop: 24,
+  },
+  overviewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    opacity: 0.8,
+  },
+  totalAmount: {
+    fontSize: 36,
+    fontWeight: '600',
+    marginBottom: 20,
+    lineHeight: 44,
+  },
+  overviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  overviewItem: {
     flex: 1,
   },
+  overviewLabel: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginBottom: 4,
+  },
+  overviewValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  overviewProgress: {
+    height: 8,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  overviewProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
   goalCard: {
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    backgroundColor: '#f8f8f8',
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   goalCardPressed: {
     opacity: 0.7,
   },
+  goalGradient: {
+    padding: 16,
+  },
   goalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  goalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  categoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   goalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  amountText: {
     fontSize: 16,
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 5,
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  percentageText: {
-    fontSize: 14,
-    textAlign: 'right',
-    marginBottom: 5,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   deadlineText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
+    fontSize: 13,
+    opacity: 0.6,
   },
-  actionButtons: {
+  amountContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    alignItems: 'baseline',
   },
-  actionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 4,
-  },
-  contributeButton: {
-    backgroundColor: '#0A84FF',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
+  currentAmount: {
+    fontSize: 16,
     fontWeight: '600',
   },
-  deleteHint: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
+  targetAmount: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginLeft: 4,
+  },
+  progressContainer: {
     marginTop: 8,
-    fontStyle: 'italic',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  percentageText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  swipeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginLeft: 10,
+  },
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 75,
+    height: '100%',
+    borderRadius: 16,
+    marginLeft: 8,
+  },
+  contributeAction: {
+    backgroundColor: '#34C759',
+  },
+  deleteAction: {
+    backgroundColor: '#FF3B30',
+  },
+  swipeActionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
   addButton: {
-    backgroundColor: '#0A84FF',
-    padding: 15,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0A84FF',
+    padding: 16,
+    borderRadius: 16,
     marginTop: 10,
   },
   addButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     width: '90%',
     maxWidth: 400,
@@ -481,47 +735,43 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
   },
+  categoryList: {
+    marginBottom: 20,
+  },
+  categoryItem: {
+    alignItems: 'center',
+    marginRight: 15,
+    opacity: 0.7,
+  },
+  selectedCategory: {
+    opacity: 1,
+  },
+  categoryItemText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  selectedCategoryText: {
+    color: '#0A84FF',
+  },
   input: {
     width: '100%',
     height: 50,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  amountInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 15,
-    paddingHorizontal: 12,
-  },
-  currencySymbol: {
-    fontSize: 16,
-    marginRight: 5,
-  },
-  amountInput: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-  },
-  dateButton: {
-    width: '100%',
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 15,
     marginBottom: 20,
+    fontSize: 16,
     justifyContent: 'center',
   },
-  dateButtonText: {
+  dateText: {
     fontSize: 16,
     color: '#000',
+  },
+  datePlaceholder: {
+    fontSize: 16,
+    color: '#666',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -530,7 +780,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginHorizontal: 5,
   },
@@ -547,7 +797,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
+    opacity: 0.6,
     marginTop: 20,
-    color: '#666',
   },
 }); 
