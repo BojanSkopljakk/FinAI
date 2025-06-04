@@ -2,6 +2,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import api from '@/lib/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { Animated, Dimensions, Platform, StyleSheet } from 'react-native';
 
@@ -19,12 +20,18 @@ export function InAppNotification() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [currentNotification, setCurrentNotification] = useState<Notification | null>(null);
   const [slideAnim] = useState(new Animated.Value(-100));
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const checkAuthStatus = async () => {
+    const token = await AsyncStorage.getItem('token');
+    setIsAuthenticated(!!token);
+  };
 
   const fetchNotifications = async () => {
+    if (!isAuthenticated) return;
+
     try {
-      // Using the correct endpoint from NotificationsController
       const response = await api.get<Notification[]>('/notifications');
-      console.log('Notifications response:', response.data);
       
       if (response.data && Array.isArray(response.data)) {
         // Filter unread notifications and sort by creation date
@@ -39,8 +46,14 @@ export function InAppNotification() {
           showNotification(unreadNotifications[0]);
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+    } catch (error: any) {
+      // Only log errors that are not 401 (Unauthorized)
+      if (error?.response?.status !== 401) {
+        console.error('Failed to fetch notifications:', error);
+      } else {
+        setIsAuthenticated(false);
+        await AsyncStorage.removeItem('token');
+      }
     }
   };
 
@@ -67,8 +80,9 @@ export function InAppNotification() {
       tension: 50,
       friction: 7
     }).start(async () => {
+      if (!isAuthenticated) return;
+
       try {
-        // Using the correct endpoint from NotificationsController
         await api.put(`/notifications/${notificationId}/read`);
         setCurrentNotification(null);
         
@@ -82,20 +96,29 @@ export function InAppNotification() {
             showNotification(remainingNotifications[0]);
           }, 500);
         }
-      } catch (error) {
-        console.error('Failed to mark notification as read:', error);
+      } catch (error: any) {
+        // Only log errors that are not 401 (Unauthorized)
+        if (error?.response?.status !== 401) {
+          console.error('Failed to mark notification as read:', error);
+        }
       }
     });
   };
 
   useEffect(() => {
-    // Initial fetch
-    fetchNotifications();
-
-    // Poll every 5 seconds
-    const interval = setInterval(fetchNotifications, 5000);
-    return () => clearInterval(interval);
+    checkAuthStatus();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Initial fetch
+      fetchNotifications();
+
+      // Poll every 5 seconds
+      const interval = setInterval(fetchNotifications, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
 
   if (!currentNotification) return null;
 
