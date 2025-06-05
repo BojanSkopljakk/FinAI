@@ -1,4 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
@@ -59,6 +60,7 @@ export default function SavingsTab() {
   const [editingGoal, setEditingGoal] = useState<SavingGoal | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<keyof typeof GOAL_CATEGORIES>('Other');
   const colorScheme = useColorScheme();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const loadGoals = async () => {
     try {
@@ -355,7 +357,7 @@ export default function SavingsTab() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { paddingBottom: tabBarHeight + 20 }]}>
         <ThemedText type="title" style={styles.title}>Savings Goals</ThemedText>
 
         <SavingsOverview />
@@ -596,7 +598,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   goalCard: {
     marginBottom: 12,

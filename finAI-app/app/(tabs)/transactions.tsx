@@ -1,4 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -86,6 +87,7 @@ export default function TransactionsScreen() {
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const { showNewTransactionModal, setShowNewTransactionModal, newTransactionType } = useTransaction();
+  const tabBarHeight = useBottomTabBarHeight();
 
   // Add new filter states
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
@@ -539,7 +541,7 @@ export default function TransactionsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { paddingBottom: tabBarHeight + 20 }]}>
         <ThemedText type="title" style={styles.title}>Transactions</ThemedText>
 
         <FilterSection />
@@ -707,6 +709,7 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
+    paddingBottom: 100,
   },
   transactionItem: {
     marginBottom: 10,

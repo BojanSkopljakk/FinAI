@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import { Alert, Dimensions, FlatList, Modal, Pressable, StyleSheet, TextInput } from 'react-native';
@@ -63,6 +64,7 @@ export default function BudgetScreen() {
   );
 
   const colorScheme = useColorScheme();
+  const tabBarHeight = useBottomTabBarHeight();
 
   useEffect(() => {
     loadBudgets();
@@ -485,7 +487,7 @@ export default function BudgetScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { paddingBottom: tabBarHeight + 20 }]}>
         <MonthSelector />
         <BudgetSummary />
 
@@ -660,7 +662,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   budgetItem: {
     marginBottom: 12,
