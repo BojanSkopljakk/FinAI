@@ -11,6 +11,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import api from '@/lib/api';
 import { useTransaction } from '../context/TransactionContext';
 
 const { width } = Dimensions.get('window');
@@ -23,22 +24,23 @@ interface QuickActionProps {
 
 const QuickAction: React.FC<QuickActionProps> = ({ icon, title, onPress }) => {
   const colorScheme = useColorScheme();
+  
   return (
     <Pressable 
-      style={styles.quickAction} 
+      style={styles.quickAction}
       onPress={onPress}
     >
       <LinearGradient
         colors={colorScheme === 'dark' ? 
           ['#2C2C2E', '#1C1C1E'] : 
-          ['#F2F2F7', '#E5E5EA']
+          ['#F2F2F7', '#FFFFFF']
         }
         style={styles.quickActionGradient}
       >
-        <IconSymbol 
-          name={icon} 
-          size={24} 
-          color={Colors[colorScheme ?? 'light'].tint} 
+        <IconSymbol
+          name={icon}
+          size={32}
+          color={Colors[colorScheme ?? 'light'].tint}
         />
         <ThemedText style={styles.quickActionText}>{title}</ThemedText>
       </LinearGradient>
@@ -48,9 +50,32 @@ const QuickAction: React.FC<QuickActionProps> = ({ icon, title, onPress }) => {
 
 export default function HomeScreen() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [balance, setBalance] = useState('$2,450.80'); //implementirati nesto ovde
+  const [balance, setBalance] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   const colorScheme = useColorScheme();
   const { setShowNewTransactionModal, setNewTransactionType } = useTransaction();
+
+  const loadBalance = async () => {
+    try {
+      // Get the current month in YYYY-MM format
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const response = await api.get('/transactions');
+      
+      // Calculate balance from transactions for the current month
+      const transactions = response.data;
+      const monthlyBalance = transactions
+        .filter((transaction: any) => transaction.date.startsWith(currentMonth))
+        .reduce((sum: number, transaction: any) => {
+          return sum + (transaction.type === 'income' ? transaction.amount : -transaction.amount);
+        }, 0);
+      
+      setBalance(monthlyBalance);
+    } catch (error: any) {
+      console.error('Error loading balance:', error?.response?.data || error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Check if user is authenticated
@@ -61,9 +86,12 @@ export default function HomeScreen() {
         return;
       }
       
-      // Get user email from storage (you might want to store this during login)
+      // Get user email from storage
       const email = await AsyncStorage.getItem('userEmail');
       setUserEmail(email);
+      
+      // Load the balance
+      await loadBalance();
     };
 
     checkAuth();
@@ -95,11 +123,14 @@ export default function HomeScreen() {
               <ThemedText type="defaultSemiBold" style={styles.welcomeText}>
                 Welcome back, {userEmail?.split('@')[0]}
               </ThemedText>
-              <ThemedText type="title" style={styles.balanceText}>
-                {balance}
+              <ThemedText type="title" style={[
+                styles.balanceText,
+                { color: balance >= 0 ? '#34C759' : '#FF3B30' }
+              ]}>
+                {isLoading ? '...' : `$${Math.abs(balance).toFixed(2)}`}
               </ThemedText>
               <ThemedText style={styles.balanceLabel}>
-                Available Balance
+                {isLoading ? 'Loading balance...' : `${balance >= 0 ? 'Available' : 'Negative'} Balance (This Month)`}
               </ThemedText>
             </LinearGradient>
           </Animated.View>
