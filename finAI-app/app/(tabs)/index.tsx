@@ -51,6 +51,7 @@ const QuickAction: React.FC<QuickActionProps> = ({ icon, title, onPress }) => {
 export default function HomeScreen() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const colorScheme = useColorScheme();
   const { setShowNewTransactionModal, setNewTransactionType } = useTransaction();
@@ -76,6 +77,20 @@ export default function HomeScreen() {
       setIsLoading(false);
     }
   };
+
+  const fetchTransactions = async () => {
+    try {
+      const res = await api.get('/transactions');
+      setTransactions(res.data); // Assuming it's an array
+    } catch (err) {
+      console.error('Failed to load transactions:', err);
+    }
+  };
+  
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+  
 
   useEffect(() => {
     // Check if user is authenticated
@@ -177,19 +192,35 @@ export default function HomeScreen() {
 
           {/* Recent Activity */}
           <Animated.View 
-            entering={FadeInUp.duration(600).delay(400)}
-            style={styles.section}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
-              Recent Activity
-            </ThemedText>
-            <ThemedView style={styles.activityList}>
-              {/* Add your recent activity items here */}
-              <ThemedText style={styles.emptyText}>
-                No recent activity
-              </ThemedText>
-            </ThemedView>
-          </Animated.View>
+  entering={FadeInUp.duration(600).delay(400)}
+  style={styles.section}
+>
+  <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+    Recent Activity
+  </ThemedText>
+
+  <ThemedView style={styles.activityList}>
+    {transactions.length > 0 ? (
+      transactions.slice(0, 5).map((transaction, index) => (
+        <ThemedView key={index} style={styles.transactionItem}>
+          <IconSymbol
+            name={transaction.type === 'income' ? 'plus.circle.fill' : 'minus.circle.fill'}
+            size={20}
+            color={transaction.type === 'income' ? '#34C759' : '#FF3B30'}
+          />
+          <ThemedText style={styles.transactionText}>
+            {transaction.category}
+          </ThemedText>
+          <ThemedText style={{ color: transaction.type === 'income' ? '#34C759' : '#FF3B30', fontWeight: '600' }}>
+            {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+          </ThemedText>
+        </ThemedView>
+      ))
+    ) : (
+      <ThemedText style={styles.emptyText}>No recent activity</ThemedText>
+    )}
+  </ThemedView>
+</Animated.View>
 
           {/* Financial Summary */}
           <Animated.View 
@@ -285,4 +316,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
   },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  transactionText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+  },
+  
 });
