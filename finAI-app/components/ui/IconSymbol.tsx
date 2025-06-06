@@ -34,6 +34,8 @@ const MAPPING = {
   'arrow.down.circle.fill': 'arrow-circle-down',
   'arrow.up.circle.fill': 'arrow-circle-up',
   'calendar': 'calendar-today',
+  'bubble.left.fill': 'chat',
+  'brain.fill': 'chat',
   'xmark.circle.fill': 'cancel',
 } as const;
 

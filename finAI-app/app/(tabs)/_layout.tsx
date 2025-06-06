@@ -133,6 +133,28 @@ export default function TabLayout() {
             ),
           }}
         />
+
+<Tabs.Screen
+  name="chat-assistant"
+  options={{
+    title: 'AI',
+    tabBarIcon: ({ color, focused }) => (
+      <View style={styles.tabIconContainer}>
+        <IconSymbol
+          size={28}
+          name="brain.fill" // or brain/headphones etc.
+          color={color}
+          style={[
+            styles.tabIcon,
+            focused && styles.tabIconFocused
+          ]}
+        />
+      </View>
+    ),
+  }}
+/>
+
+        
         <Tabs.Screen
           name="savings"
           options={{
