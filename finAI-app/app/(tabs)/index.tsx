@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, GestureResponderEvent, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Dimensions, GestureResponderEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -190,11 +190,8 @@ export default function HomeScreen() {
             </ThemedView>
           </Animated.View>
 
-          {/* Recent Activity */}
-          <Animated.View 
-  entering={FadeInUp.duration(600).delay(400)}
-  style={styles.section}
->
+        {/* Recent Activity */}
+<Animated.View entering={FadeInUp.duration(600).delay(400)} style={styles.section}>
   <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
     Recent Activity
   </ThemedText>
@@ -202,25 +199,46 @@ export default function HomeScreen() {
   <ThemedView style={styles.activityList}>
     {transactions.length > 0 ? (
       transactions.slice(0, 5).map((transaction, index) => (
-        <ThemedView key={index} style={styles.transactionItem}>
-          <IconSymbol
-            name={transaction.type === 'income' ? 'plus.circle.fill' : 'minus.circle.fill'}
-            size={20}
-            color={transaction.type === 'income' ? '#34C759' : '#FF3B30'}
-          />
-          <ThemedText style={styles.transactionText}>
-            {transaction.category}
-          </ThemedText>
-          <ThemedText style={{ color: transaction.type === 'income' ? '#34C759' : '#FF3B30', fontWeight: '600' }}>
-            {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
-          </ThemedText>
-        </ThemedView>
+        <LinearGradient
+          key={index}
+          colors={[
+            transaction.type === 'income' ? 'rgba(52,199,89,0.1)' : 'rgba(255,59,48,0.1)',
+            'transparent',
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.transactionItem}
+        >
+          <View style={styles.iconContainer}>
+            <IconSymbol
+              name={transaction.type === 'income' ? 'arrow.up.circle.fill' : 'arrow.down.circle.fill'}
+              size={20}
+              color={transaction.type === 'income' ? '#34C759' : '#FF3B30'}
+            />
+          </View>
+          <View style={styles.transactionTextContainer}>
+            <ThemedText style={styles.transactionText}>
+              {transaction.category}
+            </ThemedText>
+            <ThemedText
+              style={[
+                styles.transactionAmount,
+                {
+                  color: transaction.type === 'income' ? '#34C759' : '#FF3B30',
+                },
+              ]}
+            >
+              {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+            </ThemedText>
+          </View>
+        </LinearGradient>
       ))
     ) : (
       <ThemedText style={styles.emptyText}>No recent activity</ThemedText>
     )}
   </ThemedView>
 </Animated.View>
+
 
           {/* Financial Summary */}
           <Animated.View 
@@ -302,32 +320,69 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  activityList: {
+ /* activityList: {
     borderRadius: 16,
     padding: 16,
     backgroundColor: 'rgba(0,0,0,0.03)',
-  },
+  },*/
   emptyText: {
     textAlign: 'center',
-    opacity: 0.5,
+    color: '#888',
+    marginTop: 12,
   },
   summaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
+  activityList: {
+    gap: 12,
+  },
+  
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  transactionText: {
+  
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  
+  transactionTextContainer: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
+  
+  transactionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#000',
+  },
+  
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
   
 });

@@ -5,9 +5,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
+
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -39,7 +43,11 @@ builder.Services.AddCors(options =>
             "http://192.168.155.200:8081",
             "http://192.168.155.200:19006",
             "exp://192.168.155.200:19000",
-            "https://3930-109-245-67-202.ngrok-free.app") // Expo dev server
+<<<<<<< HEAD
+            "https://6419-109-245-67-202.ngrok-free.app") // Expo dev server
+=======
+            "https://8bff-109-245-67-202.ngrok-free.app") // Expo dev server
+>>>>>>> 59c9ad82548fc534ed828959486054c9e533fd42
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials(); // Optional for cookies/auth
@@ -49,6 +57,8 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+
+
 
 builder.Services.AddAuthorization();
 

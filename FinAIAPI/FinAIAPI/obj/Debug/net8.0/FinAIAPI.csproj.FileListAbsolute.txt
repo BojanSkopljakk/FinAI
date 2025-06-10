@@ -148,3 +148,5 @@ C:\Users\bojan\source\repos\FinAI\FinAIAPI\FinAIAPI\obj\Debug\net8.0\refint\FinA
 C:\Users\bojan\source\repos\FinAI\FinAIAPI\FinAIAPI\obj\Debug\net8.0\FinAIAPI.pdb
 C:\Users\bojan\source\repos\FinAI\FinAIAPI\FinAIAPI\obj\Debug\net8.0\FinAIAPI.genruntimeconfig.cache
 C:\Users\bojan\source\repos\FinAI\FinAIAPI\FinAIAPI\obj\Debug\net8.0\ref\FinAIAPI.dll
+C:\Users\bojan\source\repos\FinAI\FinAIAPI\FinAIAPI\bin\Debug\net8.0\OpenAI.dll
+C:\Users\bojan\source\repos\FinAI\FinAIAPI\FinAIAPI\bin\Debug\net8.0\System.ClientModel.dll
