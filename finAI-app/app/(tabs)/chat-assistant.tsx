@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import api from '@/lib/api';
+import axios from 'axios';
+import React, { useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Message = {
   id: string;
@@ -12,34 +13,49 @@ type Message = {
   text: string;
 };
 
+const callChatApi = async (message: string): Promise<string> => {
+  try {
+    const response = await api.post('/chat', { message });
+    return response.data.choices?.[0]?.message?.content || 'No response';
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      console.error('API call error:', error.response?.data || error.message);
+    } else if (error instanceof Error) {
+      console.error('API call error:', error.message);
+    } else {
+      console.error('API call error: Unknown error', error);
+    }
+    return 'Sorry, something went wrong.';
+  }
+};
+
+
 export default function ChatAssistantScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return;
-
-    const newMessage: Message = {
+  
+    const userMessage: Message = {
       id: Date.now().toString(),
       sender: 'user',
       text: input.trim(),
     };
-
-    setMessages([...messages, newMessage]);
-
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Date.now().toString() + '-ai',
-          sender: 'ai',
-          text: 'I see! Let me analyze that for you. 💡',
-        },
-      ]);
-    }, 500);
-
+  
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
+  
+    // Call backend API
+    const aiResponseText = await callChatApi(userMessage.text);
+  
+    const aiMessage: Message = {
+      id: Date.now().toString() + '-ai',
+      sender: 'ai',
+      text: aiResponseText,
+    };
+  
+    setMessages(prev => [...prev, aiMessage]);
   };
 
   return (
