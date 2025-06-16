@@ -37,6 +37,7 @@ const MAPPING = {
   'bubble.left.fill': 'chat',
   'brain.fill': 'chat',
   'xmark.circle.fill': 'cancel',
+  'camera.fill': 'camera',
 } as const;
 
 export type IconSymbolName = keyof typeof MAPPING;
