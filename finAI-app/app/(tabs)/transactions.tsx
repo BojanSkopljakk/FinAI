@@ -93,7 +93,7 @@ async function ocrSpaceExtractText(base64Image: string): Promise<string> {
   formData.append('base64Image', `data:image/jpeg;base64,${cleanedBase64}`);
   formData.append('language', 'eng');
   formData.append('isOverlayRequired', 'false');
-  formData.append('apikey', 'YOUR_OCR_SPACE_API_KEY'); // Replace with your key
+  formData.append('apikey', ''); // Replace with your key
 
   try {
     const response = await axios.post('https://api.ocr.space/parse/image', formData, {

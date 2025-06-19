@@ -48,6 +48,10 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Azure.AI.FormRecognizer": {
+              "target": "Package",
+              "version": "[4.1.0, )"
+            },
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
               "target": "Package",
               "version": "[8.0.0, )"
@@ -74,9 +78,17 @@
               "target": "Package",
               "version": "[8.0.0, )"
             },
+            "Microsoft.SemanticKernel": {
+              "target": "Package",
+              "version": "[1.56.0, )"
+            },
+            "Microsoft.SemanticKernel.Connectors.OpenAI": {
+              "target": "Package",
+              "version": "[1.56.0, )"
+            },
             "OpenAI": {
               "target": "Package",
-              "version": "[2.1.0, )"
+              "version": "[2.2.0-beta.4, )"
             },
             "Swashbuckle.AspNetCore": {
               "target": "Package",

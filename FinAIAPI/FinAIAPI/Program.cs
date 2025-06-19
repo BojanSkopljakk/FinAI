@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json;
 
 
 
@@ -12,8 +13,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -44,7 +48,7 @@ builder.Services.AddCors(options =>
             "http://192.168.155.200:19006",
             "exp://192.168.155.200:19000",
 
-            "https://16de-109-245-67-202.ngrok-free.app") // Expo dev server
+            "https://4f0f-109-245-67-202.ngrok-free.app") // Expo dev server
 
               .AllowAnyHeader()
               .AllowAnyMethod()
@@ -55,6 +59,8 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddSingleton<SemanticKernelService>();
+
 
 
 
