@@ -1,18 +1,19 @@
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/IconSymbol';
+import api from '@/lib/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import axios from 'axios';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol, type IconSymbolName } from '@/components/ui/IconSymbol';
-import api from '@/lib/api';
 import { useTransaction } from '../context/TransactionContext';
-
 type Transaction = {
   id: string;
   type: 'income' | 'expense';
@@ -73,6 +74,53 @@ const CATEGORIES = {
     'Other'
   ]
 };
+
+// Compress and resize image before OCR to keep under size limits
+async function compressAndResize(uri: string) {
+  const manipResult = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 800 } }], // resize width to 800 px, adjust as needed
+    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+  );
+  return manipResult;
+}
+
+// Send base64 image to OCR.Space and extract text
+async function ocrSpaceExtractText(base64Image: string): Promise<string> {
+  const formData = new FormData();
+  const cleanedBase64 = base64Image.replace(/\s/g, '');
+
+  formData.append('base64Image', `data:image/jpeg;base64,${cleanedBase64}`);
+  formData.append('language', 'eng');
+  formData.append('isOverlayRequired', 'false');
+  formData.append('apikey', ''); // Replace with your key
+
+  try {
+    const response = await axios.post('https://api.ocr.space/parse/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    console.log('OCR.Space full response:', JSON.stringify(response.data, null, 2));
+
+    if (
+      response.data &&
+      response.data.ParsedResults &&
+      response.data.ParsedResults.length > 0
+    ) {
+      const parsedText = response.data.ParsedResults[0].ParsedText;
+      console.log('OCR.Space extracted text:', parsedText);
+      return parsedText;
+    } else {
+      const errorMsg = response.data?.ErrorMessage || 'No parsed results found';
+      console.error('OCR.Space API error:', errorMsg);
+      throw new Error(errorMsg);
+    }
+  } catch (error: any) {
+    console.error('OCR.Space error caught:', error.response?.data || error.message || error);
+    throw error;
+  }
+}
+
 
 export default function TransactionsScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -183,6 +231,88 @@ export default function TransactionsScreen() {
       Alert.alert('Error', 'Failed to save transaction');
     }
   };
+
+   // -- New Scan Receipt handler --
+
+   
+   const handleScanReceipt = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Camera permission is required to scan receipts.');
+        return;
+      }
+  
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+        base64: false, // get base64 after compress
+      });
+  
+      if (result.canceled) return;
+  
+      const asset = result.assets[0];
+      if (!asset.uri) {
+        Alert.alert('Error', 'Failed to capture image.');
+        return;
+      }
+  
+      // Compress and resize image
+      const compressed = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+  
+      if (!compressed.base64) {
+        Alert.alert('Error', 'Failed to process image.');
+        return;
+      }
+  
+      setIsLoading(true);
+  
+      // Extract text from image via OCR.Space
+      const ocrText = await ocrSpaceExtractText(compressed.base64);
+  
+      // Send OCR text to backend GPT parser
+      const response = await api.post('/receipt/parse', { ocrText });
+  
+      setIsLoading(false);
+  
+      const parsedExpenses = response.data;
+      console.log("Parsed expenses from API:", parsedExpenses);
+
+      if (!parsedExpenses || parsedExpenses.length === 0) {
+        Alert.alert('No expenses found', 'Could not extract any expenses from the receipt.');
+        return;
+      }
+  
+      // Prefill form with first parsed expense
+      const firstExpense = parsedExpenses[0];
+      console.log("amount:", firstExpense.amount);
+      console.log("category:", firstExpense.category);
+      console.log("description:", firstExpense.description);
+      console.log("type:", firstExpense.type);
+      console.log("date:", firstExpense.date);
+      
+      setAmount(firstExpense.amount?.toString() ?? '0');
+      setCategory(firstExpense.category || 'Other');
+      setDescription(firstExpense.description || 'No description');
+      setTransactionType('expense');
+      setDate(firstExpense.date ? new Date(firstExpense.date) : new Date());
+
+      setEditingTransaction(null);
+      setModalVisible(true);
+  
+    } catch (error) {
+      setIsLoading(false);
+      console.error('Scan receipt error:', error);
+      Alert.alert('Error', 'Failed to scan receipt.');
+    }
+  };
+   
+  
 
   const resetForm = () => {
     setAmount('');
@@ -544,7 +674,7 @@ export default function TransactionsScreen() {
       <ThemedView style={[styles.container, { paddingBottom: tabBarHeight + 20 }]}>
         <ThemedText type="title" style={styles.title}>Transactions</ThemedText>
 
-        <FilterSection />
+        <FilterSection /> 
 
         <FlatList
           data={getFilteredTransactions().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())}
@@ -577,6 +707,16 @@ export default function TransactionsScreen() {
             <ThemedText style={styles.addButtonText}>
               Add Transaction
             </ThemedText>
+          </Pressable>
+        </Animated.View>
+
+                {/* NEW: Scan Receipt button */}
+                <Animated.View entering={FadeInRight}>
+          <Pressable
+            style={[styles.addButton, { backgroundColor: '#007AFF', marginTop: 10 }]}
+            onPress={handleScanReceipt}>
+            <IconSymbol size={24} name="camera.fill" color="#fff" />
+            <ThemedText style={styles.addButtonText}>Scan Receipt</ThemedText>
           </Pressable>
         </Animated.View>
 
